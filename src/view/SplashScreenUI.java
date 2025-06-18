@@ -23,7 +23,7 @@ public class SplashScreenUI extends JFrame {
 
         profileDropdown = new JComboBox<>(profiles.toArray(new String[0]));
 
-        loadBtn = new JButton("Load Profile");
+        loadBtn = new JButton("Select Profile");
         newProfileBtn = new JButton("Create New Profile");
 
         loadBtn.addActionListener(this::handleLoadProfile);

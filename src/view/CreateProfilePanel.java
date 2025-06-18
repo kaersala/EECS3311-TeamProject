@@ -51,14 +51,14 @@ public class CreateProfilePanel extends JPanel {
 
         // Row 4
         gbc.gridx = 0; gbc.gridy = 4;
-        add(new JLabel("Height:"), gbc);
+        add(new JLabel("Height (metres):"), gbc);
         gbc.gridx = 1;
         heightField = new JTextField(6);
         add(heightField, gbc);
 
         // Row 5
         gbc.gridx = 0; gbc.gridy = 5;
-        add(new JLabel("Weight:"), gbc);
+        add(new JLabel("Weight (kg):"), gbc);
         gbc.gridx = 1;
         weightField = new JTextField(6);
         add(weightField, gbc);
