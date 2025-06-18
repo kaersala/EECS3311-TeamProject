@@ -6,13 +6,13 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 
-public class EditProfilePanel extends JPanel {
+public class CreateProfilePanel extends JPanel {
     private JTextField firstNameField,lastNameField, dobField, heightField, weightField;
     private JComboBox<String> sexBox;
     private JRadioButton metricBtn, imperialBtn;
     private JButton saveBtn;
 
-    public EditProfilePanel() {
+    public CreateProfilePanel() {
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
@@ -63,7 +63,7 @@ public class EditProfilePanel extends JPanel {
         weightField = new JTextField(6);
         add(weightField, gbc);
 
-        // Row 6
+//        // Row 6
 //        gbc.gridx = 0; gbc.gridy = 6;
 //        add(new JLabel("Units:"), gbc);
 //        gbc.gridx = 1;
@@ -89,18 +89,4 @@ public class EditProfilePanel extends JPanel {
         JOptionPane.showMessageDialog(this, "Profile saved! (TODO: implement saving logic)");
     }
 
-    // Optional: preload user data into form
-    public void loadProfile(UserProfile profile) {
-        firstNameField.setText(profile.getFirstName());
-        lastNameField.setText(profile.getLastNameName());
-        sexBox.setSelectedItem(profile.getSex());
-        dobField.setText(profile.getDob().toString()); // or format
-        heightField.setText(String.valueOf(profile.getHeight()));
-        weightField.setText(String.valueOf(profile.getWeight()));
-        if ("Metric".equalsIgnoreCase(profile.getSettings().getUnits())) {
-            metricBtn.setSelected(true);
-        } else {
-            imperialBtn.setSelected(true);
-        }
-    }
 }

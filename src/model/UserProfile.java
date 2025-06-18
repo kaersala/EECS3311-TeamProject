@@ -4,7 +4,8 @@ import java.time.LocalDate;
 
 public class UserProfile {
     private int userID;
-    private String name;
+    private String firstName;
+    private String lastName;
     private LocalDate dob;
     private String sex;
     private double height; // in cm or inches
@@ -17,7 +18,9 @@ public class UserProfile {
 
     // Getters
     public int getUserID() { return userID; }
-    public String getName() { return name; }
+
+    public String getFirstName() { return firstName;}
+    public String getLastNameName() { return lastName; }
     public LocalDate getDob() { return dob; }
     public String getSex() { return sex; }
     public double getHeight() { return height; }
@@ -26,7 +29,8 @@ public class UserProfile {
 
     // Setters
     public void setUserID(int userID) { this.userID = userID; }
-    public void setName(String name) { this.name = name; }
+    public void setFirstName(String firstName) { this.firstName = firstName; }
+    public void setLastName(String name) { this.lastName = lastName; }
     public void setDob(LocalDate dob) { this.dob = dob; }
     public void setSex(String sex) { this.sex = sex; }
     public void setHeight(double height) { this.height = height; }
@@ -35,6 +39,6 @@ public class UserProfile {
 
     @Override
     public String toString() {
-        return name + " (" + userID + ")";
+        return firstName + lastName + " (" + userID + ")";
     }
 }
