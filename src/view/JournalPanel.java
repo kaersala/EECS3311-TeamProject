@@ -1,7 +1,7 @@
 package view;
 
 import controller.MealLoggerController;
-import model.Meal;
+import model.meal.Meal;
 
 import javax.swing.*;
 import javax.swing.border.TitledBorder;

@@ -1,6 +1,6 @@
 package controller;
 
-import model.Meal;
+import model.meal.Meal;
 
 import java.util.ArrayList;
 import java.util.Date;

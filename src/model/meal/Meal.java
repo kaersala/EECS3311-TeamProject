@@ -1,4 +1,4 @@
-package model;
+package model.meal;
 
 import java.util.Date;
 import java.util.HashMap;

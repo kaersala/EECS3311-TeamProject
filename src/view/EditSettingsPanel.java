@@ -1,14 +1,20 @@
 package view;
 
+import controller.UserProfileController;
+import model.user.UserProfile;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 
+
 public class EditSettingsPanel extends JPanel {
+    private final UserProfileController controller;
     private JRadioButton metricBtn, imperialBtn;
     private JButton saveBtn;
 
-    public EditSettingsPanel() {
+    public EditSettingsPanel(UserProfileController controller) {
+        this.controller = controller;
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
@@ -32,7 +38,12 @@ public class EditSettingsPanel extends JPanel {
         unitPanel.add(metricBtn);
         unitPanel.add(imperialBtn);
         add(unitPanel, gbc);
-
+        UserProfile profile = controller.getCurrentProfile();
+        if ("Metric".equalsIgnoreCase(profile.getSettings().getUnits())) {
+            metricBtn.setSelected(true);
+        } else {
+            imperialBtn.setSelected(true);
+        }
         // Save button
         gbc.gridx = 1; gbc.gridy++;
         saveBtn = new JButton("Save");
@@ -42,7 +53,7 @@ public class EditSettingsPanel extends JPanel {
 
     private void saveSettings(ActionEvent e) {
         String selectedUnit = metricBtn.isSelected() ? "Metric" : "Imperial";
-        // TODO: Apply this to the current UserProfile's Settings
-        JOptionPane.showMessageDialog(this, "Settings saved as " + selectedUnit);
+        controller.updateSettings(selectedUnit); // ✅ Controller handles it
+        JOptionPane.showMessageDialog(this, "Settings saved!");
     }
 }
