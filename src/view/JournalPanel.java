@@ -1,6 +1,7 @@
 package view;
 
 import controller.MealLoggerController;
+import controller.UserProfileController;
 import model.meal.Meal;
 
 import javax.swing.*;
@@ -14,6 +15,7 @@ import java.util.Map;
 class JournalPanel extends JPanel {
     private JTable table;
     private MealLoggerController controller = new MealLoggerController();
+    private UserProfileController userController = new UserProfileController();
     private List<Meal> meals;
     private DefaultTableModel model;
 
@@ -49,7 +51,7 @@ class JournalPanel extends JPanel {
             }
         };
 
-        meals = controller.getMeals(userId);
+        //meals = controller.getMealsForUser(userController.getCurrentProfile().getUserID());
         populateTable();
 
         table = new JTable(model);
@@ -75,7 +77,7 @@ class JournalPanel extends JPanel {
         for (Meal meal : meals) {
             model.addRow(new Object[]{
                     sdf.format(meal.getDate()),
-                    meal.getName(),
+                    meal.getType(),
                     meal.getCalories()
             });
         }
@@ -86,7 +88,7 @@ class JournalPanel extends JPanel {
         Map<String, Double> nutrients = meal.getNutrients();
 
         StringBuilder sb = new StringBuilder();
-        sb.append("<html><h2>").append(meal.getName()).append(" - Nutrient Breakdown</h2><table>");
+        sb.append("<html><h2>").append(meal.getType()).append(" - Nutrient Breakdown</h2><table>");
 
         for (Map.Entry<String, Double> entry : nutrients.entrySet()) {
             sb.append("<tr><td><b>").append(entry.getKey())

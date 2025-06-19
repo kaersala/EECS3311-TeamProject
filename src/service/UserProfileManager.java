@@ -1,5 +1,6 @@
 package service;
 
+import dao.adapter.DatabaseAdapter;
 import model.user.Settings;
 import model.user.UserProfile;
 
@@ -8,6 +9,7 @@ import java.util.ArrayList;
 public class UserProfileManager {
     private static UserProfileManager instance;
     private ArrayList<UserProfile> profiles;
+    private DatabaseAdapter db;
     private UserProfile currentProfile;
 
     public static UserProfileManager getInstance() {
@@ -16,16 +18,18 @@ public class UserProfileManager {
     }
 
     public void addProfile(UserProfile p) {
-        profiles.add(p);
+        //save to dao
     }
 
     public void getProfile(int id) {
         // get a profile from dao
     }
 
-    public ArrayList<UserProfile> loadProfiles() {
-        // logic to load profiles from dao
-        profiles = new ArrayList<UserProfile>();
+    public void loadProfiles() {
+        // get profiles from dao and store in profiles
+    }
+
+    public ArrayList<UserProfile> getProfiles() {
         return profiles;
     }
 

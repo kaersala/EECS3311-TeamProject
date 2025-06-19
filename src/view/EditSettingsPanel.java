@@ -38,8 +38,7 @@ public class EditSettingsPanel extends JPanel {
         unitPanel.add(metricBtn);
         unitPanel.add(imperialBtn);
         add(unitPanel, gbc);
-        UserProfile profile = controller.getCurrentProfile();
-        if ("Metric".equalsIgnoreCase(profile.getSettings().getUnits())) {
+        if ("Metric".equalsIgnoreCase(this.controller.getUserSettings())) {
             metricBtn.setSelected(true);
         } else {
             imperialBtn.setSelected(true);
@@ -53,7 +52,7 @@ public class EditSettingsPanel extends JPanel {
 
     private void saveSettings(ActionEvent e) {
         String selectedUnit = metricBtn.isSelected() ? "Metric" : "Imperial";
-        controller.updateSettings(selectedUnit); // ✅ Controller handles it
+        controller.updateSettings(selectedUnit); //
         JOptionPane.showMessageDialog(this, "Settings saved!");
     }
 }
