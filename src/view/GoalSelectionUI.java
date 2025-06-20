@@ -1,4 +1,69 @@
 package view;
+import model.Goal;
+import javax.swing.*;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.util.ArrayList;
+import java.util.List;
 
-public class GoalSelectionUI {
+public class GoalSelectionUI extends JPanel {
+private JList<String> goalList;
+private JComboBox<String> intensityBox;
+private JButton confirmBtn;
+private DefaultListModel<String> goalModel;
+private List<Goal> predefinedGoals;
+private List<Goal> selectedGoals;
+public GoalSelectionUI(List<Goal> goals)
+{
+this.predefinedGoals = goals;
+this.selectedGoals = new ArrayList<>();
+setLayout(new BorderLayout());
+
+// Display Goals
+goalModel = new DefaultListModel<>();
+for (Goal g : goals) {
+goalModel.addElement(g.getNutrient() + " (" + g.getDirection() + ")");
+}
+
+goalList = new JList<>(goalModel);
+goalList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+JScrollPane scrollPane = new JScrollPane(goalList);
+add(scrollPane, BorderLayout.CENTER);
+
+// Intensity Selection
+JPanel bottomPanel = new JPanel(new GridLayout(2, 1));
+intensityBox = new JComboBox<>(new String[]{"Low", "Moderate", "High"});
+bottomPanel.add(new JLabel("Select Intensity:"));
+bottomPanel.add(intensityBox);
+
+// Confirm Button
+confirmBtn = new JButton("Confirm Goals");
+confirmBtn.addActionListener(this::handleConfirm);
+bottomPanel.add(confirmBtn);
+add(bottomPanel, BorderLayout.SOUTH);
+}
+
+private void handleConfirm(ActionEvent e) {
+selectedGoals.clear();
+List<String> selectedTexts = goalList.getSelectedValuesList();
+if (selectedTexts.size() > 2) {
+JOptionPane.showMessageDialog(this, "Please select no more than 2 goals.", "Limit Exceeded", JOptionPane.WARNING_MESSAGE);
+return;
+}
+
+String selectedIntensity = (String) intensityBox.getSelectedItem();
+for (String label : selectedTexts) {
+for (Goal g : predefinedGoals) {
+String goalLabel = g.getNutrient() + " (" + g.getDirection() + ")";
+if (goalLabel.equals(label)) {
+Goal adjusted = new Goal(g.getNutrient(), g.getDirection(), g.getAmount(), selectedIntensity.toLowerCase());
+selectedGoals.add(adjusted);
+}
+}
+}
+JOptionPane.showMessageDialog(this, "Goals confirmed.");
+}
+public List<Goal> getSelectedGoals() {
+return selectedGoals;
+}
 }
