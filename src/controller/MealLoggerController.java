@@ -14,7 +14,20 @@ public class MealLoggerController implements IMealLogger {
 
     @Override
     public void logMeal(Meal meal) {
-        //mealDAO.saveMeal(meal);  // Save to database
+        JsonAdapter adapter = new JsonAdapter();
+    
+        List<String> mealJsons = adapter.loadAllJsonStrings("meal");
+        List<Meal> allMeals = new ArrayList<>();
+        for (String json : mealJsons) {
+            Meal m = adapter.deserializeMeal(json);
+            if (m != null) {
+                allMeals.add(m);
+            }
+        }
+    
+        allMeals.add(meal);
+    
+        adapter.saveMeals(allMeals, "meal.json");
     }
 
     @Override
@@ -32,7 +45,7 @@ public class MealLoggerController implements IMealLogger {
     @Override
     public List<Meal> loadMeals() {
         JsonAdapter adapter = new JsonAdapter();
-        List<String> mealJsons = adapter.loadAllJsonStrings("meal"); // 读取 meal.json 中的所有 JSON 字符串
+        List<String> mealJsons = adapter.loadAllJsonStrings("meal");
         List<Meal> meals = new ArrayList<>();
     
         for (String json : mealJsons) {
