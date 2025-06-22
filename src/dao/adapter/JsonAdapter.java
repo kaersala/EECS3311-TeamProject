@@ -170,4 +170,17 @@ public class JsonAdapter {
             e.printStackTrace();
         }
     }
+
+    private String serializeUserProfile(UserProfile profile) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("{");
+        sb.append("\"userID\":").append(profile.getUserID()).append(",");
+        sb.append("\"name\":\"").append(profile.getName()).append("\",");
+        sb.append("\"sex\":\"").append(profile.getSex()).append("\",");
+        sb.append("\"dob\":\"").append(profile.getDOB()).append("\",");
+        sb.append("\"height\":").append(profile.getHeight()).append(",");
+        sb.append("\"weight\":").append(profile.getWeight());
+        sb.append("}");
+        return sb.toString();
+    }
 }
