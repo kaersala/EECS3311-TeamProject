@@ -1,5 +1,7 @@
 package model;
 
+import model.meal.IngredientEntry;
+
 /**
  * Represents a suggested food item swap to help meet a nutrition goal.
  */
