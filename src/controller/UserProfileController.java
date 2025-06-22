@@ -4,16 +4,22 @@ import model.user.UserProfile;
 import service.UserProfileManager;
 
 import java.time.LocalDate;
+import adapter.JsonAdapter;
+import java.util.ArrayList;
 import java.util.List;
 
 public class UserProfileController {
     private final UserProfileManager manager = UserProfileManager.getInstance();
+    private JsonAdapter adapter = new JsonAdapter();
 
     public void createProfile(String name, String sex,
                               LocalDate dob, double height, double weight) {
         UserProfile newProfile = new UserProfile(name, sex, dob, height, weight);
         newProfile.getSettings().setUnits("metric");
         manager.addProfile(newProfile);
+        List<UserProfile> list = new ArrayList<>();
+        list.add(newProfile);
+        adapter.saveUserProfiles(list, "userprofile.json");
     }
 
     public void editProfile(String name, String sex,
@@ -46,5 +52,17 @@ public class UserProfileController {
     }
     public String getUserSettings(){
         return manager.getCurrentProfile().getSettings().getUnits();
+    }
+
+    public List<UserProfile> loadAllProfilesFromJson() {
+        List<String> jsonList = adapter.loadAllJsonStrings("userprofile");
+        List<UserProfile> profiles = new ArrayList<>();
+        for (String json : jsonList) {
+            UserProfile profile = adapter.deserializeUserProfile(json);
+            if (profile != null) {
+                profiles.add(profile);
+            }
+        }
+        return profiles;
     }
 }
