@@ -139,5 +139,35 @@ public class JsonAdapter {
         }
         return jsonList;
     }
-  
+
+    public void saveMeals(List<Meal> meals, String fileName) {
+        File file = new File(fileName);
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(file))) {
+            for (Meal meal : meals) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("{");
+                sb.append("\"mealID\":").append(meal.getMealID()).append(",");
+                sb.append("\"userID\":").append(meal.getUserID()).append(",");
+                sb.append("\"name\":\"").append(meal.getName()).append("\",");
+                sb.append("\"date\":\"").append(meal.getDate()).append("\",");
+                sb.append("\"type\":\"").append(meal.getType()).append("\",");
+                sb.append("\"calories\":").append(meal.getCalories()).append(",");
+                sb.append("\"ingredients\":[");
+                List<IngredientEntry> ingredients = meal.getIngredients();
+                for (int i = 0; i < ingredients.size(); i++) {
+                    IngredientEntry ie = ingredients.get(i);
+                    sb.append("{\"foodID\":").append(ie.getFoodID())
+                      .append(",\"quantity\":").append(ie.getQuantity()).append("}");
+                    if (i < ingredients.size() - 1) sb.append(",");
+                }
+                sb.append("]");
+                sb.append("}");
+    
+                writer.write(sb.toString());
+                writer.newLine();
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
 }
