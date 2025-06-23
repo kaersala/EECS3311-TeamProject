@@ -6,6 +6,9 @@ import javax.swing.*;
 
 public class ProfileApp {
     public static void main(String[] args) {
+
+        // Launch the Swing UI for profile creation
+        
         SwingUtilities.invokeLater(() -> {
             JFrame frame = new JFrame("Create New Profile");
             frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
