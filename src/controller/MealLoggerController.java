@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.ArrayList;
 
 public class MealLoggerController implements IMealLogger {
-    private MealDAO mealDAO = new MealDAO();  // Assumes you’ve implemented this DAO
+    private MealDAO mealDAO = new MealDAO();
 
     @Override
     public void logMeal(Meal meal) {
@@ -35,7 +35,7 @@ public class MealLoggerController implements IMealLogger {
         MealBuilder builder = new MealBuilder()
                 .setUserId(userId)
                 .setDate(date)
-                .setType(type);  // assuming string input
+                .setType(type); 
 
         ingredients.forEach(builder::addIngredient);
 
