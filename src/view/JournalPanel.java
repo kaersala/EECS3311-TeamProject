@@ -12,7 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.List;
 import java.util.Map;
 
-class JournalPanel extends JPanel {
+public class JournalPanel extends JPanel {
     private JTable table;
     private MealLoggerController controller = new MealLoggerController();
     private UserProfileController userController = new UserProfileController();
