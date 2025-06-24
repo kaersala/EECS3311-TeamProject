@@ -18,6 +18,10 @@ public class Meal {
         this.ingredients = ingredients;
     }
 
+    public int getMealID() {
+        return mealID;
+    }
+    
     public MealType getType() {
         return type;
     }

@@ -5,6 +5,7 @@ import model.meal.IngredientEntry;
 import model.meal.Meal;
 import model.meal.MealBuilder;
 import model.meal.MealType;
+import dao.Implementations.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.ArrayList;

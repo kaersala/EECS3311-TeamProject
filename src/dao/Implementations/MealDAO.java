@@ -1,4 +1,4 @@
-package dao.implementations;
+package dao.Implementations;
 
 import adapter.JsonAdapter;
 import dao.interfaces.IMealDAO;
