@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 public class SwapFunctionalityTest {
-
+//TEST#1
 	@Test
 	public void testManualSwapChangeCalculation() {
 	    // Override getNutrients to simulate nutrients
