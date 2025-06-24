@@ -6,7 +6,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.Date;
 
-class MealEntryPanel extends JPanel {
+public class MealEntryPanel extends JPanel {
     private JComboBox<String> mealTypeBox;
     private JSpinner dateSpinner;
     private JTable ingredientTable;
