@@ -10,9 +10,9 @@ import java.util.*;
 public class CalcTestApp {
     public static void main(String[] args) {
         // Create a mock food database
-        Map<Integer, FoodItem> foodDB = new HashMap<>();
-        foodDB.put(1, new FoodItem(1, "Beef", 250, Map.of("Calories", 250.0), "Meat"));
-        foodDB.put(2, new FoodItem(2, "Chicken", 150, Map.of("Calories", 150.0), "Meat"));
+        Map<Integer, FoodItem> foodDatabase = new HashMap<>();
+        foodDatabase.put(1, new FoodItem(1, "Beef", 250, Map.of("Calories", 250.0), "Meat"));
+        foodDatabase.put(2, new FoodItem(2, "Chicken", 150, Map.of("Calories", 150.0), "Meat"));
 
         // Create two meals: one with Beef, one with Chicken
         IngredientEntry beefEntry = new IngredientEntry(1, 100); 

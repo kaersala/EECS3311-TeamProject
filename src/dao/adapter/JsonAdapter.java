@@ -1,8 +1,10 @@
-package adapter;
+package dao.adapter;
 
 import model.meal.IngredientEntry;
 import model.meal.Meal;
 import model.meal.MealType;
+import model.user.UserProfile;
+import model.Goal;
 
 import java.io.*;
 import java.nio.file.Files;
@@ -13,6 +15,7 @@ import java.util.List;
 
 public class JsonAdapter {
     private final String mealFile = "data/json/meals.json";
+    private static final String BASE_PATH = "data/json/";
 
     public void saveMeals(List<Meal> meals) {
         try (BufferedWriter writer = Files.newBufferedWriter(Paths.get(mealFile))) {
@@ -44,17 +47,17 @@ public class JsonAdapter {
     private String serializeMeal(Meal meal) {
         StringBuilder sb = new StringBuilder();
         sb.append("{\"mealID\":").append(meal.getMealID())
-          .append(",\"userID\":").append(meal.getUserID())
-          .append(",\"name\":\"").append(meal.getName()).append("\"")
-          .append(",\"date\":\"").append(meal.getDate()).append("\"")
-          .append(",\"type\":\"").append(meal.getType().name()).append("\"")
-          .append(",\"calories\":").append(meal.getCalories())
-          .append(",\"ingredients\":[");
+                .append(",\"userID\":").append(meal.getUserID())
+                .append(",\"name\":\"").append(meal.getName()).append("\"")
+                .append(",\"date\":\"").append(meal.getDate()).append("\"")
+                .append(",\"type\":\"").append(meal.getType().name()).append("\"")
+                .append(",\"calories\":").append(meal.getCalories())
+                .append(",\"ingredients\":[");
         List<IngredientEntry> ingredients = meal.getIngredients();
         for (int i = 0; i < ingredients.size(); i++) {
             IngredientEntry entry = ingredients.get(i);
             sb.append("{\"foodID\":").append(entry.getFoodID())
-              .append(",\"quantity\":").append(entry.getQuantity()).append("}");
+                    .append(",\"quantity\":").append(entry.getQuantity()).append("}");
             if (i < ingredients.size() - 1) sb.append(",");
         }
         sb.append("]}");
@@ -63,22 +66,22 @@ public class JsonAdapter {
 
     private Meal deserializeMeal(String json) {
         try {
-            json = json.trim().substring(1, json.length() - 1); // 去掉首尾的 {}
-            String[] fields = json.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)"); // 分隔字段（考虑引号内逗号）
-    
+            json = json.trim().substring(1, json.length() - 1);
+            String[] fields = json.split(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
+
             int mealID = -1;
             int userID = -1;
             LocalDate date = null;
             MealType type = null;
             List<IngredientEntry> ingredients = new ArrayList<>();
-    
+
             for (String field : fields) {
                 String[] keyValue = field.split(":", 2);
                 if (keyValue.length != 2) continue;
-    
+
                 String key = keyValue[0].trim().replace("\"", "");
                 String value = keyValue[1].trim().replace("\"", "");
-    
+
                 switch (key) {
                     case "mealID":
                         mealID = Integer.parseInt(value);
@@ -107,17 +110,17 @@ public class JsonAdapter {
                         break;
                 }
             }
-    
+
             return new Meal(mealID, userID, date, type, ingredients);
         } catch (Exception e) {
             System.err.println("Error deserializing meal: " + e.getMessage());
             return null;
         }
     }
-  
+
     public List<String> loadAllJsonStrings(String type) {
         List<String> jsonList = new ArrayList<>();
-        File dir = new File(BASE_PATH + type + "s"); // 假设保存路径是 data/meals/
+        File dir = new File(BASE_PATH + type + "s"); 
         if (dir.exists()) {
             File[] files = dir.listFiles();
             if (files != null) {
@@ -157,12 +160,12 @@ public class JsonAdapter {
                 for (int i = 0; i < ingredients.size(); i++) {
                     IngredientEntry ie = ingredients.get(i);
                     sb.append("{\"foodID\":").append(ie.getFoodID())
-                      .append(",\"quantity\":").append(ie.getQuantity()).append("}");
+                            .append(",\"quantity\":").append(ie.getQuantity()).append("}");
                     if (i < ingredients.size() - 1) sb.append(",");
                 }
                 sb.append("]");
                 sb.append("}");
-    
+
                 writer.write(sb.toString());
                 writer.newLine();
             }
@@ -174,22 +177,12 @@ public class JsonAdapter {
     private String serializeUserProfile(UserProfile profile) {
         StringBuilder sb = new StringBuilder();
         sb.append("{");
-    
         sb.append("\"userID\":").append(profile.getUserID()).append(",");
         sb.append("\"name\":\"").append(profile.getName()).append("\",");
         sb.append("\"sex\":\"").append(profile.getSex()).append("\",");
-        sb.append("\"age\":").append(profile.getAge()).append(",");
+        sb.append("\"dob\":\"").append(profile.getDob()).append("\",");
         sb.append("\"height\":").append(profile.getHeight()).append(",");
-        sb.append("\"weight\":").append(profile.getWeight()).append(",");
-    
-        Goal goal = profile.getGoal();
-        sb.append("\"goal\":{");
-        sb.append("\"calories\":").append(goal.getCalories()).append(",");
-        sb.append("\"protein\":").append(goal.getProtein()).append(",");
-        sb.append("\"fat\":").append(goal.getFat()).append(",");
-        sb.append("\"carbohydrates\":").append(goal.getCarbohydrates());
-        sb.append("}");
-    
+        sb.append("\"weight\":").append(profile.getWeight());
         sb.append("}");
         return sb.toString();
     }

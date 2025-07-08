@@ -10,9 +10,9 @@ import java.util.*;
 public class SwapApp {
     public static void main(String[] args) {
         // Create a mock food database
-        Map<Integer, FoodItem> foodDB = new HashMap<>();
-        foodDB.put(1, new FoodItem(1, "Beef", 250, Map.of("Calories", 250.0), "Meat"));
-        foodDB.put(2, new FoodItem(2, "Chicken", 150, Map.of("Calories", 150.0), "Meat"));
+        Map<Integer, FoodItem> foodDatabase = new HashMap<>();
+        foodDatabase.put(1, new FoodItem(1, "Beef", 250, Map.of("Calories", 250.0), "Meat"));
+        foodDatabase.put(2, new FoodItem(2, "Chicken", 150, Map.of("Calories", 150.0), "Meat"));
 
         // Create a meal with Beef
         IngredientEntry beefEntry = new IngredientEntry(1, 100); // 100g
@@ -24,7 +24,7 @@ public class SwapApp {
 
         // Generate swap suggestions
         SwapEngine swapEngine = new SwapEngine();
-        List<SwapSuggestion> suggestions = swapEngine.generateSwaps(goals, meal.getIngredients(), foodDB);
+        List<SwapSuggestion> suggestions = swapEngine.generateSwaps(goals, meal.getIngredients(), foodDatabase);
 
         // Print swap suggestions
         if (!suggestions.isEmpty()) {
