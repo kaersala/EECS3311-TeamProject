@@ -4,7 +4,6 @@ import model.meal.Meal;
 import model.meal.MealType;
 import model.meal.IngredientEntry;
 import model.user.UserProfile;
-import model.Goal;
 import model.FoodItem;
 import model.Nutrient;
 import java.sql.*;
@@ -14,16 +13,21 @@ public class MySQLAdapter implements DatabaseAdapter {
     private Connection connection;
 
     @Override
-    public void connect() {
-        String url = ""; // enter your own url, e.g. jdbc:mysql://localhost:3306/cnf2015
-        String user = ""; // enter your own user name
-        String password = ""; // enter your own password
+    public Connection connect() {
+        // Use configuration class to get database connection information
+        String url = DatabaseConfig.getDatabaseUrl();
+        String user = DatabaseConfig.getUsername();
+        String password = DatabaseConfig.getPassword();
+        
+        // Print configuration information (for debugging)
+        DatabaseConfig.printConfig();
         try {
             connection = DriverManager.getConnection(url, user, password);
             System.out.println("MySQL connection established.");
+            return connection;
         } catch (SQLException e) {
-            System.err.println("Failed to connect to MySQL database.");
-            e.printStackTrace();
+            System.err.println("Failed to connect to MySQL database: " + e.getMessage());
+            return null;
         }
     }
 
@@ -53,7 +57,6 @@ public class MySQLAdapter implements DatabaseAdapter {
             }
         } catch (SQLException e) {
             System.err.println("Error saving meal: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -84,7 +87,6 @@ public class MySQLAdapter implements DatabaseAdapter {
             }
         } catch (SQLException e) {
             System.err.println("Error loading meals: " + e.getMessage());
-            e.printStackTrace();
         }
         return meals;
     }
@@ -102,7 +104,6 @@ public class MySQLAdapter implements DatabaseAdapter {
             stmt.executeUpdate();
         } catch (SQLException e) {
             System.err.println("Error saving profile: " + e.getMessage());
-            e.printStackTrace();
         }
     }
 
@@ -123,7 +124,6 @@ public class MySQLAdapter implements DatabaseAdapter {
             }
         } catch (SQLException e) {
             System.err.println("Error loading profiles: " + e.getMessage());
-            e.printStackTrace();
         }
         return profiles;
     }
@@ -141,7 +141,6 @@ public class MySQLAdapter implements DatabaseAdapter {
             }
         } catch (SQLException e) {
             System.err.println("Error loading ingredients: " + e.getMessage());
-            e.printStackTrace();
         }
         return ingredients;
     }
@@ -157,14 +156,13 @@ public class MySQLAdapter implements DatabaseAdapter {
                 String name = rs.getString("FoodDescription");
                 double calories = rs.getDouble("Calories");
                 String foodGroup = rs.getString("FoodGroupName");
-                // nutrients字段需要单独查表或后续补充
+                // nutrients field needs to be queried separately or supplemented later
                 Map<String, Double> nutrients = new HashMap<>();
                 FoodItem food = new FoodItem(foodId, name, calories, nutrients, foodGroup);
                 foods.add(food);
             }
         } catch (SQLException e) {
             System.err.println("Error loading foods: " + e.getMessage());
-            e.printStackTrace();
         }
         return foods;
     }
@@ -184,9 +182,9 @@ public class MySQLAdapter implements DatabaseAdapter {
                 nutrients.add(nutrient);
             }
         } catch (SQLException e) {
-            System.err.println("Error loading nutrients from database.");
-            e.printStackTrace();
+            System.err.println("Error loading nutrients from database: " + e.getMessage());
         }
         return nutrients;
     }
 }
+
