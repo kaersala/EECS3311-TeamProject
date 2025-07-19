@@ -1,8 +1,7 @@
-// === MealController.java ===
 package controller;
 
-
 import dao.Implementations.MealDAO;
+import dao.interfaces.IMealDAO;
 import model.meal.IngredientEntry;
 import model.meal.Meal;
 import model.meal.MealBuilder;
@@ -12,7 +11,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 public class MealLoggerController implements IMealLogger {
-    private final MealDAO mealDAO = new MealDAOImpl();
+    private final IMealDAO mealDAO = new MealDAO();
 
     @Override
     public void logMeal(Meal meal) {
@@ -31,14 +30,13 @@ public class MealLoggerController implements IMealLogger {
 
     @Override
     public List<Meal> getMealsForUser(int userId) {
-        return mealDAO.getMealsForUser(userId);
+        return mealDAO.getMealsByUserId(userId);
     }
 
     @Override
     public List<Meal> loadMeals() {
-        // Placeholder: in a real system, userId should be passed dynamically
         int exampleUserId = 1;
-        return mealDAO.getMealsForUser(exampleUserId);
+        return mealDAO.getMealsByUserId(exampleUserId);
     }
 
     @Override

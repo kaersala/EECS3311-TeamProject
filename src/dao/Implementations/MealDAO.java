@@ -42,4 +42,17 @@ public class MealDAO implements IMealDAO {
         allMeals.add(meal);
         adapter.saveMeals(allMeals);
     }
+
+    @Override
+    public void updateMeal(Meal meal) {
+        List<Meal> allMeals = adapter.loadMeals();
+        if (allMeals == null) allMeals = new ArrayList<>();
+        for (int i = 0; i < allMeals.size(); i++) {
+            if (allMeals.get(i).getMealID() == meal.getMealID()) {
+                allMeals.set(i, meal);
+                adapter.saveMeals(allMeals);
+                return;
+            }
+        }
+    }
 }
