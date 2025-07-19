@@ -1,14 +1,14 @@
-package dao.implementation;
+package dao.Implementations;
 
 import dao.interfaces.IIngredientDAO;
-import model.IngredientEntry;
+import model.meal.IngredientEntry;
 
 import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class IngredientDAO implements IIngredientDAO {
-    private Connection connection;
+    private final Connection connection;
 
     public IngredientDAO(Connection connection) {
         this.connection = connection;
@@ -25,14 +25,12 @@ public class IngredientDAO implements IIngredientDAO {
             while (rs.next()) {
                 int foodId = rs.getInt("FoodID");
                 double quantity = rs.getDouble("Quantity");
-
                 IngredientEntry entry = new IngredientEntry(foodId, quantity);
                 ingredients.add(entry);
             }
 
         } catch (SQLException e) {
             System.err.println("Error loading ingredients: " + e.getMessage());
-            e.printStackTrace();
         }
 
         return ingredients;
@@ -54,7 +52,6 @@ public class IngredientDAO implements IIngredientDAO {
 
         } catch (SQLException e) {
             System.err.println("Error getting ingredient by FoodID: " + e.getMessage());
-            e.printStackTrace();
         }
 
         return entry;
