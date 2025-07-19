@@ -1,3 +1,8 @@
+/*
+ * Launches a Swing frame
+ * Loads your MealEntryPanel
+ * Handles window setup
+ */
 package app;
 
 import view.MealEntryPanel;

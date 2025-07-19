@@ -2,24 +2,22 @@ package controller;
 
 import model.user.UserProfile;
 import service.UserProfileManager;
+import dao.UserProfileDAO;
+import dao.Implementations.UserProfileDAOImpl;
 
 import java.time.LocalDate;
-import adapter.JsonAdapter;
-import java.util.ArrayList;
 import java.util.List;
 
 public class UserProfileController {
     private final UserProfileManager manager = UserProfileManager.getInstance();
-    private JsonAdapter adapter = new JsonAdapter();
+    private final UserProfileDAO userProfileDAO = new UserProfileDAOImpl();
 
     public void createProfile(String name, String sex,
                               LocalDate dob, double height, double weight) {
         UserProfile newProfile = new UserProfile(name, sex, dob, height, weight);
         newProfile.getSettings().setUnits("metric");
         manager.addProfile(newProfile);
-        List<UserProfile> list = new ArrayList<>();
-        list.add(newProfile);
-        adapter.saveUserProfiles(list, "userprofile.json");
+        userProfileDAO.saveUserProfile(newProfile);
     }
 
     public void editProfile(String name, String sex,
@@ -30,8 +28,7 @@ public class UserProfileController {
         profile.setDob(dob);
         profile.setHeight(height);
         profile.setWeight(weight);
-
-        manager.saveProfile(profile);
+        userProfileDAO.updateUserProfile(profile);
     }
 
     public UserProfile getCurrentProfile(){
@@ -39,30 +36,20 @@ public class UserProfileController {
     }
 
     public List<UserProfile> getAllProfiles(){
-        return manager.getProfiles();
+        return userProfileDAO.getAllUserProfiles();
     }
 
     public void setCurrentProfile(int id){
         manager.setCurrentProfile(id);
     }
+
     public void updateSettings(String units) {
         UserProfile profile = manager.getCurrentProfile();
         profile.getSettings().setUnits(units);
-        manager.saveProfile(profile); // Or however persistence is handled
+        userProfileDAO.updateUserProfile(profile);
     }
+
     public String getUserSettings(){
         return manager.getCurrentProfile().getSettings().getUnits();
     }
-
-    public List<UserProfile> loadAllProfilesFromJson() {
-        List<String> jsonList = adapter.loadAllJsonStrings("userprofile");
-        List<UserProfile> profiles = new ArrayList<>();
-        for (String json : jsonList) {
-            UserProfile profile = adapter.deserializeUserProfile(json);
-            if (profile != null) {
-                profiles.add(profile);
-            }
-        }
-        return profiles;
-    }
-}
+} 

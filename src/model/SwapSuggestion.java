@@ -16,12 +16,12 @@ public class SwapSuggestion {
         this.reason = reason;
     }
 
-    // Getters
-    public IngredientEntry getOriginalItem() {
+    // Updated Getters
+    public IngredientEntry getOriginal() {
         return originalItem;
     }
 
-    public IngredientEntry getReplacementItem() {
+    public IngredientEntry getReplacement() {
         return replacementItem;
     }
 
@@ -29,12 +29,12 @@ public class SwapSuggestion {
         return reason;
     }
 
-    // Setters
-    public void setOriginalItem(IngredientEntry originalItem) {
+    // Updated Setters
+    public void setOriginal(IngredientEntry originalItem) {
         this.originalItem = originalItem;
     }
 
-    public void setReplacementItem(IngredientEntry replacementItem) {
+    public void setReplacement(IngredientEntry replacementItem) {
         this.replacementItem = replacementItem;
     }
 

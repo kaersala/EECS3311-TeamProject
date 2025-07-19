@@ -9,43 +9,36 @@ import model.SwapSuggestion;
 import model.meal.Meal;
 import model.user.UserProfile;
 import service.NutrientChangesCalculator;
-import adapter.JsonAdapter;
+import dao.Implementations.FoodItemDAOImpl;
+import dao.FoodItemDAO;
 
 import java.util.*;
 
 public class MealSwappingController {
     private final UserProfileController userProfileController;
-    private final MealLoggerController mealLoggerController;
+    private final MealController mealController;
     private final NutrientChangesCalculator changesCalculator;
-    private final JsonAdapter adapter;
+    private final FoodItemDAO foodItemDAO;
 
     public MealSwappingController(UserProfileController userProfileController,
-                                  MealLoggerController mealLoggerController) {
+                                  MealController mealController) {
         this.userProfileController = userProfileController;
-        this.mealLoggerController = mealLoggerController;
+        this.mealController = mealController;
         this.changesCalculator = new NutrientChangesCalculator();
-        this.adapter = new JsonAdapter();
+        this.foodItemDAO = new FoodItemDAOImpl();
     }
 
     public List<SwapSuggestion> generateSwapSuggestions(Meal meal, List<Goal> goals) {
-        // 1. Load food item database from JSON or static data
-        List<FoodItem> foodList = adapter.loadAllFoodItems("fooditems.json");
+        // Load food item database from MySQL using DAO
+        List<FoodItem> foodList = foodItemDAO.getAllFoodItems();
         Map<Integer, FoodItem> foodDatabase = new HashMap<>();
         for (FoodItem item : foodList) {
             foodDatabase.put(item.getFoodId(), item);
         }
 
-        // 2. Analyze nutrients in the current meal
-        NutritionAnalyzer analyzer = new NutritionAnalyzer(foodDatabase);
-        Map<String, Double> currentNutrients = analyzer.analyzeMeal(meal);
-
-        // 3. Compute gaps based on goals
-        GoalChecker checker = new GoalChecker();
-        Map<String, Double> gaps = checker.evaluate(currentNutrients, goals);
-
-        // 4. Generate swap suggestions
-        SwapEngine swapEngine = new SwapEngine(foodDatabase);
-        return swapEngine.suggestSwaps(meal, goals, gaps);
+        // Generate swap suggestions
+        SwapEngine swapEngine = new SwapEngine();
+        return swapEngine.generateSwaps(goals, meal.getIngredients(), foodDatabase);
     }
 
     public Map<String, Double> getNutrientChange(Meal original, Meal swapped) {
@@ -57,6 +50,6 @@ public class MealSwappingController {
     }
 
     public List<Meal> getLoggedMeals() {
-        return mealLoggerController.loadMeals();
+        return mealController.loadMeals();
     }
 }

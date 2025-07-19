@@ -4,6 +4,9 @@ import model.FoodItem;
 import java.util.Comparator;
 import java.util.List;
 
+/**
+ * Strategy to recommend a lower-calorie food item from the same group.
+ */
 public class CalorieSwapStrategy implements RecommendationStrategy {
 
     @Override

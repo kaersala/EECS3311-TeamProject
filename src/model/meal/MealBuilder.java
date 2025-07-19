@@ -9,6 +9,7 @@ public class MealBuilder {
     private LocalDate date;
     private MealType type;
     public List<IngredientEntry> ingredients = new ArrayList<>();
+    private int mealID = -1;
 
     public MealBuilder setUserId(int userID) {
         this.userID = userID;
@@ -32,6 +33,11 @@ public class MealBuilder {
 
     public Meal build() {
         return new Meal(-1, userID, date, type, ingredients); // mealID can be assigned in DAO
+    }
+
+    public MealBuilder setMealID(int mealID) {
+        this.mealID = mealID;
+        return this;
     }
 }
 

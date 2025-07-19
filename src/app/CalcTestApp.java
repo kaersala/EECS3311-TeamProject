@@ -1,3 +1,9 @@
+/*
+* Creates an in-memory Map<Integer, FoodItem> (no DB or JSON loading)
+* Creates Meal objects manually
+* Uses NutrientChangesCalculator to compare two meals
+* Prints nutrient differences to console
+ */
 package app;
 
 import model.*;

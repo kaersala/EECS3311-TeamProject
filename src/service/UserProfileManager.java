@@ -1,32 +1,56 @@
 package service;
 
 import dao.adapter.DatabaseAdapter;
-import model.user.Settings;
+import dao.adapter.MySQLAdapter;
 import model.user.UserProfile;
 
 import java.util.ArrayList;
+import java.util.List;
 
+/**
+ * Singleton class to manage user profiles.
+ */
 public class UserProfileManager {
     private static UserProfileManager instance;
     private ArrayList<UserProfile> profiles;
-    private DatabaseAdapter db;
+    private final DatabaseAdapter db;
     private UserProfile currentProfile;
 
+    private UserProfileManager() {
+        db = new MySQLAdapter(); // or swap in a different adapter like CSV/JSON
+        db.connect();
+        profiles = new ArrayList<>();
+        loadProfiles();
+    }
+
     public static UserProfileManager getInstance() {
-        if (instance == null) instance = new UserProfileManager();
+        if (instance == null) {
+            instance = new UserProfileManager();
+        }
         return instance;
     }
 
     public void addProfile(UserProfile p) {
-        //save to dao
+        db.saveProfile(p);
+        profiles.add(p);
+        if (currentProfile == null) {
+            currentProfile = p;
+        }
     }
 
-    public void getProfile(int id) {
-        // get a profile from dao
+    public UserProfile getProfile(int id) {
+        for (UserProfile p : profiles) {
+            if (p.getUserID() == id) return p;
+        }
+        return null;
     }
 
     public void loadProfiles() {
-        // get profiles from dao and store in profiles
+        List<UserProfile> loaded = db.loadProfiles();
+        profiles = new ArrayList<>(loaded);
+        if (!profiles.isEmpty()) {
+            currentProfile = profiles.get(0); // default selection
+        }
     }
 
     public ArrayList<UserProfile> getProfiles() {
@@ -34,17 +58,25 @@ public class UserProfileManager {
     }
 
     public void saveProfile(UserProfile p) {
-        // logic to save/ update a profile
+        db.saveProfile(p);
+        for (int i = 0; i < profiles.size(); i++) {
+            if (profiles.get(i).getUserID() == p.getUserID()) {
+                profiles.set(i, p); // update local list
+                break;
+            }
+        }
     }
 
     public void setCurrentProfile(int id) {
-        //set current profile to profile with given id
+        for (UserProfile p : profiles) {
+            if (p.getUserID() == id) {
+                currentProfile = p;
+                break;
+            }
+        }
     }
 
     public UserProfile getCurrentProfile() {
         return currentProfile;
     }
-
-
 }
-
