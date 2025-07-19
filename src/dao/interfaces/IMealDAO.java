@@ -7,5 +7,4 @@ public interface IMealDAO {
     List<Meal> getMealsByUserId(int userId);
     Meal getMealById(int mealId);
     void saveMeal(Meal meal);
-    void updateMeal(Meal meal);
 }
