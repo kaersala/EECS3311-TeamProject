@@ -2,15 +2,15 @@ package controller;
 
 import model.user.UserProfile;
 import service.UserProfileManager;
-import dao.UserProfileDAO;
-import dao.Implementations.UserProfileDAOImpl;
+import dao.interfaces.IUserProfileDAO;
+import dao.Implementations.UserProfileDAO;
 
 import java.time.LocalDate;
 import java.util.List;
 
 public class UserProfileController {
     private final UserProfileManager manager = UserProfileManager.getInstance();
-    private final UserProfileDAO userProfileDAO = new UserProfileDAOImpl();
+    private final IUserProfileDAO userProfileDAO = new UserProfileDAO();
 
     public void createProfile(String name, String sex,
                               LocalDate dob, double height, double weight) {
@@ -31,15 +31,15 @@ public class UserProfileController {
         userProfileDAO.updateUserProfile(profile);
     }
 
-    public UserProfile getCurrentProfile(){
+    public UserProfile getCurrentProfile() {
         return manager.getCurrentProfile();
     }
 
-    public List<UserProfile> getAllProfiles(){
+    public List<UserProfile> getAllProfiles() {
         return userProfileDAO.getAllUserProfiles();
     }
 
-    public void setCurrentProfile(int id){
+    public void setCurrentProfile(int id) {
         manager.setCurrentProfile(id);
     }
 
@@ -49,7 +49,7 @@ public class UserProfileController {
         userProfileDAO.updateUserProfile(profile);
     }
 
-    public String getUserSettings(){
+    public String getUserSettings() {
         return manager.getCurrentProfile().getSettings().getUnits();
     }
-} 
+}
