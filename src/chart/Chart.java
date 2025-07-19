@@ -1,8 +1,9 @@
 package chart;
 
-import org.jfree.chart.JFreeChart;
+import java.util.Map;
 
 public interface Chart {
-    void display();
-    JFreeChart getChart();
+    void setTitle(String title);
+    void setData(Map<String, Double> data);
+    void render();
 }
