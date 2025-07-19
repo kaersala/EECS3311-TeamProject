@@ -1,6 +1,7 @@
-package dao.implementations;
+package dao.Implementations;
 
-import adapter.JsonAdapter;
+import dao.adapter.DatabaseAdapter;
+import dao.adapter.MySQLAdapter;
 import dao.interfaces.IUserProfileDAO;
 import model.user.UserProfile;
 
@@ -9,39 +10,41 @@ import java.util.List;
 
 public class UserProfileDAO implements IUserProfileDAO {
 
-    private final JsonAdapter adapter;
+    private final DatabaseAdapter adapter;
 
     public UserProfileDAO() {
-        this.adapter = new JsonAdapter();
+        this.adapter = new MySQLAdapter();
+        this.adapter.connect();
     }
 
     @Override
     public UserProfile getUserProfile(int userId) {
-        UserProfile profile = adapter.loadUserProfile();
-        return (profile != null && profile.getUserID() == userId) ? profile : null;
+        List<UserProfile> profiles = adapter.loadProfiles();
+        return profiles.stream()
+                .filter(profile -> profile.getUserID() == userId)
+                .findFirst()
+                .orElse(null);
     }
 
     @Override
     public List<UserProfile> getAllUserProfiles() {
-        List<UserProfile> result = new ArrayList<>();
-        UserProfile profile = adapter.loadUserProfile();
-        if (profile != null) result.add(profile);
-        return result;
+        return adapter.loadProfiles();
     }
 
     @Override
     public void saveUserProfile(UserProfile profile) {
-        adapter.saveUserProfile(profile);
+        adapter.saveProfile(profile);
     }
 
     @Override
     public void updateUserProfile(UserProfile profile) {
-        adapter.saveUserProfile(profile);
+        adapter.saveProfile(profile);
     }
 
     @Override
     public void deleteUserProfile(int userId) {
-        java.io.File file = new java.io.File("data/json/profile.json");
-        if (file.exists()) file.delete();
+        // This would need to be implemented in the DatabaseAdapter interface
+        // For now, we'll leave it as a placeholder
+        System.out.println("Delete user profile functionality needs to be implemented in DatabaseAdapter");
     }
 }
