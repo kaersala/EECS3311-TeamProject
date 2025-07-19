@@ -25,11 +25,7 @@ public class MealDAO implements IMealDAO {
 
     @Override
     public Meal getMealById(int mealId) {
-        // For now, we'll load all meals for all users and filter by meal ID
-        // This is not efficient but works as a temporary solution
-        // A better approach would be to add a method to DatabaseAdapter interface
         List<Meal> allMeals = new ArrayList<>();
-        // We need to implement a method to get all meals or modify the interface
         // For now, this is a placeholder that returns null
         return null;
     }
