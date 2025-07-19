@@ -1,8 +1,8 @@
 package dao.Implementations;
 
-import adapter.MySQLAdapter;
+import dao.adapter.MySQLAdapter;
 import dao.interfaces.INutrientDAO;
-import model.user.Nutrient;
+import model.Nutrient;
 
 import java.sql.*;
 import java.util.ArrayList;
@@ -28,12 +28,13 @@ public class NutrientDAO implements INutrientDAO {
             while (rs.next()) {
                 int id = rs.getInt("NutrientID");
                 String name = rs.getString("NutrientSymbol");
-                String unit = rs.getString("Unit");
-                nutrients.add(new Nutrient(id, name, unit));
+                String unit = rs.getString("NutrientUnit");
+                double amount = 0.0; // Default amount, you might want to get this from nutrient_amount table
+                nutrients.add(new Nutrient(id, name, unit, amount));
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Error loading nutrients: " + e.getMessage());
         }
 
         return nutrients;
@@ -52,12 +53,13 @@ public class NutrientDAO implements INutrientDAO {
 
             if (rs.next()) {
                 String name = rs.getString("NutrientSymbol");
-                String unit = rs.getString("Unit");
-                nutrient = new Nutrient(nutrientId, name, unit);
+                String unit = rs.getString("NutrientUnit");
+                double amount = 0.0; // Default amount
+                nutrient = new Nutrient(nutrientId, name, unit, amount);
             }
 
         } catch (SQLException e) {
-            e.printStackTrace();
+            System.err.println("Error getting nutrient by ID: " + e.getMessage());
         }
 
         return nutrient;
