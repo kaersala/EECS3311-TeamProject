@@ -1,5 +1,6 @@
 package dao.adapter;
 
+import java.sql.Connection;
 import java.util.List;
 import model.*;
 import model.meal.IngredientEntry;
@@ -7,7 +8,7 @@ import model.meal.Meal;
 import model.user.UserProfile;
 
 public interface DatabaseAdapter {
-    void connect();
+    Connection connect();
 
     void saveMeal(Meal meal);
     List<Meal> loadMeals(int userId);
