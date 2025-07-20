@@ -1,6 +1,6 @@
 package dao.interfaces;
 
-import model.user.FoodItem;
+import model.FoodItem;
 import java.util.List;
 
 public interface IFoodDAO {

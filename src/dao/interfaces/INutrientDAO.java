@@ -1,6 +1,6 @@
 package dao.interfaces;
 
-import model.user.Nutrient;
+import model.Nutrient;
 import java.util.List;
 
 public interface INutrientDAO {

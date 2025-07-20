@@ -1,6 +1,6 @@
 package dao.interfaces;
 
-import model.IngredientEntry;
+import model.meal.IngredientEntry;
 import java.util.List;
 
 public interface IIngredientDAO {
