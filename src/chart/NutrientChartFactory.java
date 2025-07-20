@@ -1,24 +1,46 @@
 package chart;
 
 import java.util.Map;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.general.DefaultPieDataset;
-import org.jfree.chart.ChartFactory;
 
+/**
+ * Factory for creating nutrition-related charts
+ */
 public class NutrientChartFactory {
 
-    public Chart createNutrientPieChart(Map<String, Double> data) {
-        DefaultPieDataset dataset = new DefaultPieDataset();
-        for (Map.Entry<String, Double> entry : data.entrySet()) {
-            dataset.setValue(entry.getKey(), entry.getValue());
+    /**
+     * Creates a bar chart comparing nutrient changes
+     */
+    public Chart createNutrientComparisonChart(Map<String, Double> nutrientChanges) {
+        SwingChart chart = new SwingChart("Nutrient Changes After Swap");
+        chart.setData(nutrientChanges);
+        return chart;
+    }
+
+    /**
+     * Creates a pie chart showing daily nutrient distribution
+     */
+    public Chart createDailyNutrientChart(Map<String, Double> dailyNutrients) {
+        SwingChart chart = new SwingChart("Daily Nutrient Distribution");
+        chart.setData(dailyNutrients);
+        return chart;
+    }
+
+    /**
+     * Creates a line chart showing nutrient trends over time
+     */
+    public Chart createNutrientTrendChart(Map<String, Map<String, Double>> nutrientTrends) {
+        // Convert nested map to flat map for display
+        Map<String, Double> flatData = new java.util.HashMap<>();
+        for (Map.Entry<String, Map<String, Double>> entry : nutrientTrends.entrySet()) {
+            String date = entry.getKey();
+            Map<String, Double> nutrients = entry.getValue();
+            for (Map.Entry<String, Double> nutrient : nutrients.entrySet()) {
+                flatData.put(date + " - " + nutrient.getKey(), nutrient.getValue());
+            }
         }
-
-        JFreeChart pieChart = ChartFactory.createPieChart(
-                "Nutrient Breakdown",
-                dataset,
-                true, true, false
-        );
-
-        return new SwingChart(pieChart);
+        
+        SwingChart chart = new SwingChart("Nutrient Trends Over Time");
+        chart.setData(flatData);
+        return chart;
     }
 }

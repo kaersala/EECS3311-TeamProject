@@ -9,31 +9,31 @@ import model.SwapSuggestion;
 import model.meal.Meal;
 import model.user.UserProfile;
 import service.NutrientChangesCalculator;
-import dao.Implementations.FoodItemDAOImpl;
-import dao.FoodItemDAO;
+import dao.Implementations.FoodDAO;
+import dao.interfaces.IFoodDAO;
 
 import java.util.*;
 
 public class MealSwappingController {
     private final UserProfileController userProfileController;
-    private final MealController mealController;
+    private final MealLoggerController mealController;
     private final NutrientChangesCalculator changesCalculator;
-    private final FoodItemDAO foodItemDAO;
+    private final IFoodDAO foodDAO;
 
     public MealSwappingController(UserProfileController userProfileController,
-                                  MealController mealController) {
+                                  MealLoggerController mealController) {
         this.userProfileController = userProfileController;
         this.mealController = mealController;
         this.changesCalculator = new NutrientChangesCalculator();
-        this.foodItemDAO = new FoodItemDAOImpl();
+        this.foodDAO = new FoodDAO(null); // Use null connection for demo
     }
 
     public List<SwapSuggestion> generateSwapSuggestions(Meal meal, List<Goal> goals) {
         // Load food item database from MySQL using DAO
-        List<FoodItem> foodList = foodItemDAO.getAllFoodItems();
+        List<FoodItem> foodList = foodDAO.loadFoods();
         Map<Integer, FoodItem> foodDatabase = new HashMap<>();
         for (FoodItem item : foodList) {
-            foodDatabase.put(item.getFoodId(), item);
+            foodDatabase.put(item.getFoodID(), item);
         }
 
         // Generate swap suggestions

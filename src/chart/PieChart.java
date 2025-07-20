@@ -2,7 +2,7 @@ package chart;
 
 import java.util.Map;
 
-public class PieChart extends Chart {
+public class PieChart implements Chart {
     private String title;
     private Map<String, Double> data;
 
@@ -18,10 +18,7 @@ public class PieChart extends Chart {
 
     @Override
     public void render() {
-        // You can add JFreeChart rendering logic here later
+        // Implementation for rendering pie chart
         System.out.println("Rendering Pie Chart: " + title);
-        for (String key : data.keySet()) {
-            System.out.println(key + ": " + data.get(key));
-        }
     }
 }

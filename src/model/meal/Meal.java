@@ -26,6 +26,11 @@ public class Meal {
         return type;
     }
 
+    // Alias method for compatibility
+    public MealType getMealType() {
+        return type;
+    }
+
     public double getCalories() {
         // placeholder for actual calorie calculation
         return 100.0;
@@ -47,7 +52,5 @@ public class Meal {
     public LocalDate getDate() {
         return date;
     }
-    
-
 }
 

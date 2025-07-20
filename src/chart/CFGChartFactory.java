@@ -1,10 +1,5 @@
 package chart;
 
-import org.jfree.chart.ChartFactory;
-import org.jfree.chart.JFreeChart;
-import org.jfree.data.general.DefaultPieDataset;
-import org.jfree.data.category.DefaultCategoryDataset;
-
 import java.util.Map;
 
 /**
@@ -14,37 +9,22 @@ import java.util.Map;
  */
 public class CFGChartFactory {
 
-    
+    /**
+     * Creates a plate chart showing food group distribution
+     */
     public Chart createPlateChart(Map<String, Double> data) {
-        DefaultPieDataset dataset = new DefaultPieDataset();
-
-        for (Map.Entry<String, Double> entry : data.entrySet()) {
-            dataset.setValue(entry.getKey(), entry.getValue());
-        }
-
-        JFreeChart pieChart = ChartFactory.createPieChart(
-                "Canada Food Guide Plate",
-                dataset,
-                true,  // include legend
-                true,  // tooltips
-                false  // URLs
-        );
-
-        return new SwingChart(pieChart);
+        SwingChart chart = new SwingChart("Canada Food Guide Plate");
+        chart.setData(data);
+        return chart;
     }
 
-   
+    /**
+     * Creates an adherence bar chart showing CFG compliance score
+     */
     public Chart createAdherenceBarChart(double score) {
-        DefaultCategoryDataset dataset = new DefaultCategoryDataset();
-        dataset.addValue(score, "Adherence", "Your Score");
-
-        JFreeChart barChart = ChartFactory.createBarChart(
-                "CFG Compliance Score",
-                "User",
-                "Score",
-                dataset
-        );
-
-        return new SwingChart(barChart);
+        Map<String, Double> scoreData = Map.of("Your Score", score);
+        SwingChart chart = new SwingChart("CFG Compliance Score");
+        chart.setData(scoreData);
+        return chart;
     }
 }

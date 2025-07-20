@@ -8,8 +8,14 @@ import java.util.List;
 public class SplashScreenUI extends JFrame {
     private JComboBox<String> profileDropdown;
     private JButton loadBtn, newProfileBtn;
+    private Runnable onProfileSelected; // Callback for when profile is selected
 
     public SplashScreenUI(List<String> profiles) {
+        this(profiles, null);
+    }
+
+    public SplashScreenUI(List<String> profiles, Runnable onProfileSelected) {
+        this.onProfileSelected = onProfileSelected;
         setTitle("NutriSci - Select Profile");
         setSize(400, 220);
         setLocationRelativeTo(null);
@@ -48,7 +54,6 @@ public class SplashScreenUI extends JFrame {
         add(bottom, BorderLayout.SOUTH);
     }
 
-
     private void handleLoadProfile(ActionEvent e) {
         String selectedProfile = (String) profileDropdown.getSelectedItem();
         if (selectedProfile == null) {
@@ -56,9 +61,16 @@ public class SplashScreenUI extends JFrame {
             return;
         }
 
-        // Simulate loading
+        // Show loading message
         JOptionPane.showMessageDialog(this, "Loading profile: " + selectedProfile);
-        // TODO: UserProfileManager.loadProfile() and launch Main UI
+        
+        // Close this window
+        this.dispose();
+        
+        // Call the callback to continue to next step
+        if (onProfileSelected != null) {
+            onProfileSelected.run();
+        }
     }
 
     // For testing

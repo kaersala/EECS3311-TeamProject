@@ -41,6 +41,6 @@ public class MealLoggerController implements IMealLogger {
 
     @Override
     public void updateMeal(Meal meal) {
-        mealDAO.updateMeal(meal);
+        mealDAO.saveMeal(meal);
     }
 } 

@@ -20,13 +20,6 @@
     </properties>
 
     <dependencies>
-        <!-- JFreeChart for charting -->
-        <dependency>
-            <groupId>org.jfree</groupId>
-            <artifactId>jfreechart</artifactId>
-            <version>1.5.4</version>
-        </dependency>
-        
         <!-- MySQL Connector -->
         <dependency>
             <groupId>mysql</groupId>
@@ -34,18 +27,18 @@
             <version>8.0.33</version>
         </dependency>
 
-        <!-- JUnit for testing (optional) -->
+        <!-- JUnit 5 for testing -->
         <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.13.2</version>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <version>5.9.2</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
 
     <build>
         <sourceDirectory>src</sourceDirectory>
-        <testSourceDirectory>test</testSourceDirectory>
+        <testSourceDirectory>src/test</testSourceDirectory>
         
         <plugins>
             <!-- Maven Compiler Plugin -->
@@ -54,8 +47,8 @@
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.11.0</version>
                 <configuration>
-                                    <source>16</source>
-                <target>16</target>
+                    <source>16</source>
+                    <target>16</target>
                 </configuration>
             </plugin>
 

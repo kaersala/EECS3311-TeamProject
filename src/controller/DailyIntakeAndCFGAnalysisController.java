@@ -5,7 +5,7 @@ import model.FoodItem;
 import model.meal.Meal;
 import model.user.UserProfile;
 import service.CFGComparisonEngine;
-import dao.MealDAO;
+import dao.Implementations.MealDAO;
 
 import java.util.HashMap;
 import java.util.List;
@@ -21,7 +21,7 @@ public class DailyIntakeAndCFGAnalysisController {
     }
 
     public Map<String, Double> getDailyNutrientIntake(int userId) {
-        List<Meal> meals = mealDAO.getMealsForUser(userId);
+        List<Meal> meals = mealDAO.getMealsByUserId(userId);
         NutritionAnalyzer analyzer = new NutritionAnalyzer(foodDatabase);
         Map<String, Double> dailyTotals = new HashMap<>();
 
