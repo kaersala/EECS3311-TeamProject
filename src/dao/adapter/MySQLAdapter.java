@@ -61,6 +61,42 @@ public class MySQLAdapter implements DatabaseAdapter {
     }
 
     @Override
+    public void updateMeal(Meal meal) {
+        String mealUpdate = "UPDATE meal SET UserID = ?, Date = ?, Type = ? WHERE MealID = ?";
+        String deleteIngredients = "DELETE FROM ingredient WHERE MealID = ?";
+        String ingredientInsert = "INSERT INTO ingredient (MealID, FoodID, Quantity) VALUES (?, ?, ?)";
+        
+        try (
+                PreparedStatement mealStmt = connection.prepareStatement(mealUpdate);
+                PreparedStatement deleteStmt = connection.prepareStatement(deleteIngredients);
+                PreparedStatement ingredientStmt = connection.prepareStatement(ingredientInsert)
+        ) {
+            // Update meal details
+            mealStmt.setInt(1, meal.getUserID());
+            mealStmt.setDate(2, java.sql.Date.valueOf(meal.getDate()));
+            mealStmt.setString(3, meal.getType().name());
+            mealStmt.setInt(4, meal.getMealID());
+            mealStmt.executeUpdate();
+            
+            // Delete existing ingredients
+            deleteStmt.setInt(1, meal.getMealID());
+            deleteStmt.executeUpdate();
+            
+            // Insert new ingredients
+            for (IngredientEntry entry : meal.getIngredients()) {
+                ingredientStmt.setInt(1, meal.getMealID());
+                ingredientStmt.setInt(2, entry.getFoodID());
+                ingredientStmt.setDouble(3, entry.getQuantity());
+                ingredientStmt.addBatch();
+            }
+            ingredientStmt.executeBatch();
+            
+        } catch (SQLException e) {
+            System.err.println("Error updating meal: " + e.getMessage());
+        }
+    }
+
+    @Override
     public List<Meal> loadMeals(int userId) {
         List<Meal> meals = new ArrayList<>();
         String mealQuery = "SELECT * FROM meal WHERE UserID = ?";
@@ -148,16 +184,20 @@ public class MySQLAdapter implements DatabaseAdapter {
     @Override
     public List<FoodItem> loadFoods() {
         List<FoodItem> foods = new ArrayList<>();
-        String query = "SELECT FoodID, FoodDescription, FoodCode, FoodGroupName, FoodSourceDescription, Calories FROM food_name LEFT JOIN food_group ON food_name.FoodGroupID = food_group.FoodGroupID LEFT JOIN food_source ON food_name.FoodSourceID = food_source.FoodSourceID";
+        String query = "SELECT f.FoodID, f.FoodDescription, f.FoodCode, g.FoodGroupName, s.FoodSourceDescription FROM food_name f LEFT JOIN food_group g ON f.FoodGroupID = g.FoodGroupID LEFT JOIN food_source s ON f.FoodSourceID = s.FoodSourceID";
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(query)) {
             while (rs.next()) {
                 int foodId = rs.getInt("FoodID");
                 String name = rs.getString("FoodDescription");
-                double calories = rs.getDouble("Calories");
                 String foodGroup = rs.getString("FoodGroupName");
-                // nutrients field needs to be queried separately or supplemented later
-                Map<String, Double> nutrients = new HashMap<>();
+                
+                // Get calories for this food (NutrientID = 208 for KCAL)
+                double calories = getCaloriesForFood(foodId);
+                
+                // Get nutrients for this food
+                Map<String, Double> nutrients = getNutrientsForFood(foodId);
+                
                 FoodItem food = new FoodItem(foodId, name, calories, nutrients, foodGroup);
                 foods.add(food);
             }
@@ -165,6 +205,39 @@ public class MySQLAdapter implements DatabaseAdapter {
             System.err.println("Error loading foods: " + e.getMessage());
         }
         return foods;
+    }
+    
+    private double getCaloriesForFood(int foodId) {
+        String query = "SELECT NutrientValue FROM nutrient_amount WHERE FoodID = ? AND NutrientID = 208";
+        try (PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, foodId);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                return rs.getDouble("NutrientValue");
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting calories for food " + foodId + ": " + e.getMessage());
+        }
+        return 0.0; // Default calories if not found
+    }
+    
+    private Map<String, Double> getNutrientsForFood(int foodId) {
+        Map<String, Double> nutrients = new HashMap<>();
+        String query = "SELECT nn.NutrientName, na.NutrientValue FROM nutrient_amount na " +
+                      "JOIN nutrient_name nn ON na.NutrientID = nn.NutrientID " +
+                      "WHERE na.FoodID = ? AND na.NutrientValue > 0";
+        try (PreparedStatement stmt = connection.prepareStatement(query)) {
+            stmt.setInt(1, foodId);
+            ResultSet rs = stmt.executeQuery();
+            while (rs.next()) {
+                String nutrientName = rs.getString("NutrientName");
+                double value = rs.getDouble("NutrientValue");
+                nutrients.put(nutrientName, value);
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting nutrients for food " + foodId + ": " + e.getMessage());
+        }
+        return nutrients;
     }
 
     @Override

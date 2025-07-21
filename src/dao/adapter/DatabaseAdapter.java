@@ -11,6 +11,7 @@ public interface DatabaseAdapter {
     Connection connect();
 
     void saveMeal(Meal meal);
+    void updateMeal(Meal meal);
     List<Meal> loadMeals(int userId);
 
     void saveProfile(UserProfile profile);

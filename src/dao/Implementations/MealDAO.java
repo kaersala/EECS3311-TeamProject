@@ -34,4 +34,9 @@ public class MealDAO implements IMealDAO {
     public void saveMeal(Meal meal) {
         adapter.saveMeal(meal);
     }
+
+    @Override
+    public void updateMeal(Meal meal) {
+        adapter.updateMeal(meal);
+    }
 }

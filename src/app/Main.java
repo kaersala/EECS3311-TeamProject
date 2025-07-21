@@ -84,10 +84,13 @@ public class Main {
         // Create sample profiles for demo
         List<String> profiles = Arrays.asList("Alice Smith", "Bob Johnson", "Charlie Lee");
         
-        // Create splash screen with callback to continue to goal selection
+        // Create splash screen with callback to continue to main menu
         SplashScreenUI splashScreen = new SplashScreenUI(profiles, () -> {
             // This will be called when a profile is selected
-            showGoalSelection();
+            // Create a default user and go directly to main menu
+            currentUser = new UserProfile("Demo User", "Male", LocalDate.of(1990, 1, 1), 175.0, 70.0);
+            currentUser.setUserID(1);
+            showMainMenu();
         });
         
         splashScreen.setVisible(true);
@@ -131,8 +134,50 @@ public class Main {
         mainFrame.setVisible(true);
     }
     
+    private static void showGoalSelectionFromMenu() {
+        // Sample predefined goals
+        List<Goal> goals = new ArrayList<>();
+        goals.add(new Goal("Fiber", "Increase", 2.0, ""));
+        goals.add(new Goal("Calories", "Decrease", 10.0, ""));
+        goals.add(new Goal("Sodium", "Decrease", 1.5, ""));
+        goals.add(new Goal("Protein", "Increase", 5.0, ""));
+        goals.add(new Goal("Fat", "Decrease", 3.0, ""));
+        goals.add(new Goal("Carbohydrates", "Decrease", 5.0, ""));
+
+        // Create a new frame for goal selection (not replacing main frame)
+        JFrame goalFrame = new JFrame("Set Nutritional Goals");
+        goalFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        goalFrame.setSize(500, 400);
+        goalFrame.setLocationRelativeTo(null);
+        
+        GoalSelectionUI goalSelectionUI = new GoalSelectionUI(goals);
+        
+        // Add a save button to update goals and return to main menu
+        JButton saveBtn = new JButton("Save Goals");
+        saveBtn.addActionListener(e -> {
+            userGoals = goalSelectionUI.getSelectedGoals();
+            if (!userGoals.isEmpty()) {
+                JOptionPane.showMessageDialog(goalFrame, "Goals updated successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(goalFrame, "Please select at least one goal.", "No Goals Selected", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            goalFrame.dispose(); // Close the goal selection window
+        });
+        
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(goalSelectionUI, BorderLayout.CENTER);
+        panel.add(saveBtn, BorderLayout.SOUTH);
+        
+        goalFrame.add(panel);
+        goalFrame.setVisible(true);
+    }
+    
     private static void showMainMenu() {
-        mainFrame.dispose();
+        // Only dispose if mainFrame already exists
+        if (mainFrame != null) {
+            mainFrame.dispose();
+        }
         
         mainFrame = new JFrame("NutriSci - Main Menu");
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -156,7 +201,7 @@ public class Main {
         JButton swapFoodBtn = new JButton("Swap Food Items");
         JButton viewChartsBtn = new JButton("View Charts");
         JButton viewGoalsBtn = new JButton("View Goals");
-        JButton settingsBtn = new JButton("Settings");
+        JButton setGoalsBtn = new JButton("Set Goals");
         JButton profileBtn = new JButton("Edit Profile");
         JButton exitBtn = new JButton("Exit");
         
@@ -165,7 +210,7 @@ public class Main {
         swapFoodBtn.addActionListener(e -> showFoodSwap());
         viewChartsBtn.addActionListener(e -> showCharts());
         viewGoalsBtn.addActionListener(e -> showGoalsDialog());
-        settingsBtn.addActionListener(e -> showSettingsDialog());
+        setGoalsBtn.addActionListener(e -> showGoalSelectionFromMenu());
         profileBtn.addActionListener(e -> showProfileDialog());
         exitBtn.addActionListener(e -> System.exit(0));
         
@@ -174,7 +219,7 @@ public class Main {
         menuPanel.add(swapFoodBtn);
         menuPanel.add(viewChartsBtn);
         menuPanel.add(viewGoalsBtn);
-        menuPanel.add(settingsBtn);
+        menuPanel.add(setGoalsBtn);
         menuPanel.add(profileBtn);
         menuPanel.add(exitBtn);
         
