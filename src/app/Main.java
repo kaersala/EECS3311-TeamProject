@@ -426,16 +426,25 @@ public class Main {
     }
     
     private static void showSettingsDialog() {
-        JFrame settingsFrame = new JFrame("Settings");
+    	if (currentUser == null) {
+            JOptionPane.showMessageDialog(mainFrame, "No user profile loaded. Cannot open settings.");
+            return;
+        }
+
+        // Set current user in the manager (required!)
+        UserProfileManager.getInstance().setCurrentProfile(currentUser.getUserID());
+
+        JFrame settingsFrame = new JFrame("Edit Settings");
         settingsFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         settingsFrame.setSize(400, 300);
         settingsFrame.setLocationRelativeTo(null);
-        
+
         UserProfileController userController = new UserProfileController();
         EditSettingsPanel settingsPanel = new EditSettingsPanel(userController);
         settingsFrame.add(settingsPanel);
         settingsFrame.setVisible(true);
     }
+
     
     private static void showProfileDialog() {
         if (currentUser != null) {
@@ -453,4 +462,3 @@ public class Main {
     }
 }
     
-

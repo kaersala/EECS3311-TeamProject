@@ -1,12 +1,10 @@
 package view;
 
 import controller.UserProfileController;
-import model.user.UserProfile;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
-
 
 public class EditSettingsPanel extends JPanel {
     private final UserProfileController controller;
@@ -15,21 +13,29 @@ public class EditSettingsPanel extends JPanel {
 
     public EditSettingsPanel(UserProfileController controller) {
         this.controller = controller;
+
         setLayout(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 5, 5, 5);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
 
         // Title
-        gbc.gridx = 0; gbc.gridy = 0; gbc.gridwidth = 2;
-        add(new JLabel("Edit Settings", SwingConstants.CENTER), gbc);
+        gbc.gridx = 0;
+        gbc.gridy = 0;
+        gbc.gridwidth = 2;
+        JLabel title = new JLabel("Edit Settings", SwingConstants.CENTER);
+        title.setFont(new Font("Arial", Font.BOLD, 16));
+        add(title, gbc);
 
-        // Units label
-        gbc.gridy++; gbc.gridwidth = 1;
+        // Units Label
+        gbc.gridy++;
+        gbc.gridwidth = 1;
+        gbc.gridx = 0;
         add(new JLabel("Units:"), gbc);
 
-        // Units radio buttons
+        // Radio Buttons
         gbc.gridx = 1;
-        JPanel unitPanel = new JPanel();
+        JPanel unitPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         metricBtn = new JRadioButton("Metric");
         imperialBtn = new JRadioButton("Imperial");
         ButtonGroup unitGroup = new ButtonGroup();
@@ -38,13 +44,18 @@ public class EditSettingsPanel extends JPanel {
         unitPanel.add(metricBtn);
         unitPanel.add(imperialBtn);
         add(unitPanel, gbc);
-        if ("Metric".equalsIgnoreCase(this.controller.getUserSettings())) {
-            metricBtn.setSelected(true);
-        } else {
+
+        // Pre-select current setting
+        String currentSetting = controller.getUserSettings();
+        if (currentSetting != null && currentSetting.equalsIgnoreCase("Imperial")) {
             imperialBtn.setSelected(true);
+        } else {
+            metricBtn.setSelected(true);
         }
-        // Save button
-        gbc.gridx = 1; gbc.gridy++;
+
+        // Save Button
+        gbc.gridy++;
+        gbc.gridx = 1;
         saveBtn = new JButton("Save");
         saveBtn.addActionListener(this::saveSettings);
         add(saveBtn, gbc);
@@ -52,7 +63,7 @@ public class EditSettingsPanel extends JPanel {
 
     private void saveSettings(ActionEvent e) {
         String selectedUnit = metricBtn.isSelected() ? "Metric" : "Imperial";
-        controller.updateSettings(selectedUnit); //
-        JOptionPane.showMessageDialog(this, "Settings saved!");
+        controller.updateSettings(selectedUnit);
+        JOptionPane.showMessageDialog(this, "Settings updated to " + selectedUnit + "!");
     }
 }

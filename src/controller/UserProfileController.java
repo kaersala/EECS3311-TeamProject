@@ -50,6 +50,9 @@ public class UserProfileController {
     }
 
     public String getUserSettings() {
-        return manager.getCurrentProfile().getSettings().getUnits();
+    	UserProfile profile = manager.getCurrentProfile();
+        return (profile != null && profile.getSettings() != null) 
+               ? profile.getSettings().getUnits() 
+               : "Metric"; // default fallback
     }
 }
