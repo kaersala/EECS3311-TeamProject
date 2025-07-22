@@ -79,4 +79,11 @@ public class UserProfileManager {
     public UserProfile getCurrentProfile() {
         return currentProfile;
     }
+    
+    public void setProfilesForTest(ArrayList<UserProfile> profiles) {
+        this.profiles = profiles;
+        if (!profiles.isEmpty()) {
+            this.currentProfile = profiles.get(0);
+        }
+    }
 }
