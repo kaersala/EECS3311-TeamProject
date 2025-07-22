@@ -282,29 +282,28 @@ public class Main {
         titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
         panel.add(titleLabel, BorderLayout.NORTH);
 
-        // 1. Sample food database
         Map<Integer, FoodItem> foodDatabase = new HashMap<>();
         foodDatabase.put(1, new FoodItem(1, "Beef Steak", 250, Map.of("Calories", 250.0, "Protein", 26.0, "Fat", 15.0), "Meat"));
         foodDatabase.put(2, new FoodItem(2, "Chicken Breast", 165, Map.of("Calories", 165.0, "Protein", 31.0, "Fat", 3.6), "Meat"));
         foodDatabase.put(3, new FoodItem(3, "Lentils", 120, Map.of("Calories", 120.0, "Protein", 9.0, "Fiber", 8.0), "Legume"));
 
-        // 2. Create a sample meal (e.g., 100g beef)
+       
         List<IngredientEntry> currentMeal = List.of(new IngredientEntry(1, 100)); // 100g beef
 
-        // 3. Create a hardcoded goal (decrease calories with "High" intensity)
-        Goal goal = new Goal("Calories", "Decrease", 10.0, "High");
+      
+        Goal goal = new Goal("Calories", "Decrease", 1.5, "High");
         List<Goal> goals = List.of(goal);
 
-        // 4. Generate swap suggestions
+    
         SwapEngine engine = new SwapEngine();
         List<SwapSuggestion> suggestions = engine.generateSwaps(goals, currentMeal, foodDatabase);
 
-        // ✅ NEW: Create a JTextArea to display suggestions
+       
         JTextArea swapArea = new JTextArea();
         swapArea.setEditable(false);
         swapArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
 
-        // 5. Populate swap suggestions
+       
         StringBuilder sb = new StringBuilder("Swap Suggestions:\n\n");
         for (SwapSuggestion s : suggestions) {
             FoodItem original = foodDatabase.get(s.getOriginal().getFoodID());
