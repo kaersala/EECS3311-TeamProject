@@ -82,4 +82,3 @@ public class SplashScreenUI extends JFrame {
 //    }
 }
 
-

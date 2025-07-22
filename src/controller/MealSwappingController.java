@@ -11,7 +11,7 @@ import model.user.UserProfile;
 import service.NutrientChangesCalculator;
 import dao.Implementations.FoodDAO;
 import dao.interfaces.IFoodDAO;
-
+import backend.SwapEngine;
 import java.util.*;
 
 public class MealSwappingController {
@@ -19,6 +19,7 @@ public class MealSwappingController {
     private final MealLoggerController mealController;
     private final NutrientChangesCalculator changesCalculator;
     private final IFoodDAO foodDAO;
+    private final SwapEngine swapEngine = new SwapEngine();
 
     public MealSwappingController(UserProfileController userProfileController,
                                   MealLoggerController mealController) {
@@ -51,5 +52,8 @@ public class MealSwappingController {
 
     public List<Meal> getLoggedMeals() {
         return mealController.loadMeals();
+    }
+    public SwapEngine getSwapEngine() {
+        return swapEngine;
     }
 }
