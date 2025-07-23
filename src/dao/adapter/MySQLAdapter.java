@@ -22,14 +22,19 @@ public class MySQLAdapter implements DatabaseAdapter {
         // Print configuration information (for debugging)
         DatabaseConfig.printConfig();
         try {
+            Class.forName("com.mysql.cj.jdbc.Driver");
             connection = DriverManager.getConnection(url, user, password);
-            System.out.println("MySQL connection established.");
+
+            //  Add this to confirm success
+            System.out.println("CONNECTED: " + (connection != null));
             return connection;
-        } catch (SQLException e) {
-            System.err.println("Failed to connect to MySQL database: " + e.getMessage());
+        } catch (Exception e) {
+            System.err.println(" DB CONNECTION ERROR: " + e.getMessage());
+            e.printStackTrace();
             return null;
         }
     }
+    
 
     @Override
     public void saveMeal(Meal meal) {
@@ -129,6 +134,12 @@ public class MySQLAdapter implements DatabaseAdapter {
 
     @Override
     public void saveProfile(UserProfile profile) {
+        // Simple validation: Reject if name is null or empty
+        if (profile.getName() == null || profile.getName().trim().isEmpty()) {
+            System.err.println("Invalid profile: name is null or empty.");
+            return; // Do not proceed with DB insert
+        }
+
         String insertProfileQuery = "INSERT INTO user_profile (UserID, UserName, Sex, Dob, Height, Weight) VALUES (?, ?, ?, ?, ?, ?)";
         try (PreparedStatement stmt = connection.prepareStatement(insertProfileQuery)) {
             stmt.setInt(1, profile.getUserID());
@@ -149,15 +160,18 @@ public class MySQLAdapter implements DatabaseAdapter {
         String profileQuery = "SELECT * FROM user_profile";
         try (Statement stmt = connection.createStatement();
              ResultSet rs = stmt.executeQuery(profileQuery)) {
-            while (rs.next()) {
-                String name = rs.getString("UserName");
-                String sex = rs.getString("Sex");
-                java.time.LocalDate dob = rs.getDate("Dob").toLocalDate();
-                double height = rs.getDouble("Height");
-                double weight = rs.getDouble("Weight");
-                UserProfile profile = new UserProfile(name, sex, dob, height, weight);
-                profiles.add(profile);
-            }
+        	while (rs.next()) {
+        	    int userId = rs.getInt("UserID");
+        	    String name = rs.getString("UserName");
+        	    String sex = rs.getString("Sex");
+        	    java.time.LocalDate dob = rs.getDate("Dob").toLocalDate();
+        	    double height = rs.getDouble("Height");
+        	    double weight = rs.getDouble("Weight");
+
+        	    UserProfile profile = new UserProfile(name, sex, dob, height, weight);
+        	    profile.setUserID(userId); 
+        	    profiles.add(profile);
+        	}
         } catch (SQLException e) {
             System.err.println("Error loading profiles: " + e.getMessage());
         }

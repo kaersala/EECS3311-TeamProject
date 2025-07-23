@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class UserProfileDAO implements IUserProfileDAO {
-
     private final DatabaseAdapter adapter;
 
     public UserProfileDAO() {
@@ -34,6 +33,8 @@ public class UserProfileDAO implements IUserProfileDAO {
     @Override
     public void saveUserProfile(UserProfile profile) {
         adapter.saveProfile(profile);
+       
+
     }
 
     @Override

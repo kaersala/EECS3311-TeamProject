@@ -13,7 +13,7 @@ public class UserProfile {
 
     // Default constructor
     public UserProfile() {
-        this.settings = new Settings("Metric");
+        this.settings = new Settings("metric");
     }
 
     public UserProfile(String name, String sex, LocalDate dob, double height, double weight) {
@@ -22,7 +22,7 @@ public class UserProfile {
         this.dob = dob;
         this.height = height;
         this.weight = weight;
-        this.settings = new Settings("Metric");
+        this.settings = new Settings("metric");
     }
 
     // Getters
