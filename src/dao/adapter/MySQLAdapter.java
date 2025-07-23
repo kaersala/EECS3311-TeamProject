@@ -122,6 +122,27 @@ public class MySQLAdapter implements DatabaseAdapter {
             System.err.println("Error deleting meal ID " + mealId + ": " + e.getMessage());
         }
     }
+    public void deleteAllMealsForUser(int userId) {
+        try {
+            // 1. Delete from ingredients table
+            String deleteIngredients = "DELETE FROM ingredient WHERE MealID IN (SELECT MealID FROM meal WHERE UserID = ?)";
+            PreparedStatement stmt1 = connection.prepareStatement(deleteIngredients);
+            stmt1.setInt(1, userId);
+            stmt1.executeUpdate();
+            stmt1.close();
+
+            // 2. Delete from meal table
+            String deleteMeals = "DELETE FROM meal WHERE UserID = ?";
+            PreparedStatement stmt3 = connection.prepareStatement(deleteMeals);
+            stmt3.setInt(1, userId);
+            int rows = stmt3.executeUpdate();
+            stmt3.close();
+
+            System.out.println("Deleted " + rows + " meals for user " + userId);
+        } catch (SQLException e) {
+            System.err.println("Error deleting meals for user " + userId + ": " + e.getMessage());
+        }
+    }
 
     @Override
     public List<Meal> loadMeals(int userId) {
