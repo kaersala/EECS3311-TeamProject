@@ -53,4 +53,3 @@ public class Meal {
         return date;
     }
 }
-
