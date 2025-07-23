@@ -221,7 +221,7 @@ public class MySQLAdapter implements DatabaseAdapter {
         return foods;
     }
     
-    private double getCaloriesForFood(int foodId) {
+    public double getCaloriesForFood(int foodId) {
         String query = "SELECT NutrientValue FROM nutrient_amount WHERE FoodID = ? AND NutrientID = 208";
         try (PreparedStatement stmt = connection.prepareStatement(query)) {
             stmt.setInt(1, foodId);
@@ -235,7 +235,7 @@ public class MySQLAdapter implements DatabaseAdapter {
         return 0.0; // Default calories if not found
     }
     
-    private Map<String, Double> getNutrientsForFood(int foodId) {
+    public Map<String, Double> getNutrientsForFood(int foodId) {
         Map<String, Double> nutrients = new HashMap<>();
         String query = "SELECT nn.NutrientName, na.NutrientValue FROM nutrient_amount na " +
                       "JOIN nutrient_name nn ON na.NutrientID = nn.NutrientID " +
