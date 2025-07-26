@@ -11,7 +11,7 @@ public class DatabaseConfig {
     private static final String DEFAULT_PORT = "3306";
     private static final String DEFAULT_DATABASE = "cnf2015";
     private static final String DEFAULT_USERNAME = "root";
-    private static final String DEFAULT_PASSWORD = "";
+    private static final String DEFAULT_PASSWORD = "abcd1234";
     
     // Get database URL
     // This method was found through internet research for MySQL JDBC connection

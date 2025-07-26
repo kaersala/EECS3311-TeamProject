@@ -9,10 +9,12 @@ import backend.*;
 import controller.*;
 import dao.Implementations.*;
 import dao.interfaces.IGoalDAO;
+import dao.adapter.*;
 import chart.*;
 
 import javax.swing.*;
 import java.awt.*;
+import java.sql.Connection;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.List;
@@ -38,14 +40,29 @@ public class Main {
     }
     
     private static void initializeApplication() {
-        // Initialize DAOs with null connection for demo (in real app, would use actual database connection)
-        mealDAO = new MealDAO();
-        foodDAO = new FoodDAO(null); // Will use in-memory data instead
-        userProfileDAO = new UserProfileDAO();
-        goalDAO = new GoalDAO();
+        // Initialize database adapter
+        DatabaseAdapter databaseAdapter = new MySQLAdapter();
+        Connection connection = databaseAdapter.connect();
         
-        // Load food database
-        loadFoodDatabase();
+        if (connection != null) {
+            // Initialize DAOs with database connection
+            mealDAO = new MealDAO();
+            foodDAO = new FoodDAO(connection);
+            userProfileDAO = new UserProfileDAO();
+            goalDAO = new GoalDAO();
+            
+            System.out.println("Database connection established successfully");
+        } else {
+            // Fallback to in-memory data if database connection fails
+            System.err.println("Warning: Database connection failed, using in-memory data");
+            mealDAO = new MealDAO();
+            foodDAO = new FoodDAO(null);
+            userProfileDAO = new UserProfileDAO();
+            goalDAO = new GoalDAO();
+            
+            // Load food database
+            loadFoodDatabase();
+        }
         
         // Initialize services
         initializeServices();
