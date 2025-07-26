@@ -313,11 +313,11 @@ public class MySQLAdapter implements DatabaseAdapter {
         // First, load all food names and groups
         String foodQuery = "SELECT f.FoodID, f.FoodDescription, f.FoodCode, g.FoodGroupName FROM food_name f LEFT JOIN food_group g ON f.FoodGroupID = g.FoodGroupID";
         
-        // Load all calories in one query
+        // Load all calories in one query - use specific nutrient ID for calories
         String caloriesQuery = "SELECT na.FoodID, nn.NutrientName, nn.NutrientUnit, na.NutrientValue " +
                               "FROM nutrient_amount na " +
                               "JOIN nutrient_name nn ON na.NutrientID = nn.NutrientID " +
-                              "WHERE nn.NutrientName LIKE '%calor%' OR nn.NutrientName LIKE '%kcal%' OR nn.NutrientName LIKE '%energy%' OR nn.NutrientName LIKE '%kilojoule%'";
+                              "WHERE na.NutrientID = 208"; // 208 is the standard nutrient ID for KCAL
         
         // Load all nutrients in one query
         String nutrientsQuery = "SELECT na.FoodID, nn.NutrientName, nn.NutrientUnit, na.NutrientValue " +
@@ -380,7 +380,7 @@ public class MySQLAdapter implements DatabaseAdapter {
                     if (foodGroup == null) foodGroup = "Unknown Group";
                     
                     // Get pre-loaded calories
-                    double calories = caloriesMap.getOrDefault(foodId, 100.0);
+                    double calories = caloriesMap.getOrDefault(foodId, 0.0);
                     
                     // Get pre-loaded nutrients
                     Map<String, Double> nutrients = nutrientsMap.getOrDefault(foodId, new HashMap<>());
@@ -394,7 +394,6 @@ public class MySQLAdapter implements DatabaseAdapter {
             
         } catch (SQLException e) {
             System.err.println("Error loading foods: " + e.getMessage());
-            e.printStackTrace();
         }
         
         return foods;
@@ -473,23 +472,10 @@ public class MySQLAdapter implements DatabaseAdapter {
         try (PreparedStatement stmt = connection.prepareStatement(query)) {
             stmt.setInt(1, foodId);
             ResultSet rs = stmt.executeQuery();
-            int count = 0;
             while (rs.next()) {
                 String nutrientName = rs.getString("NutrientName");
                 double value = rs.getDouble("NutrientValue");
                 nutrients.put(nutrientName, value);
-                count++;
-            }
-            // Debug: Show nutrient count for first few foods
-            if (foodId <= 3) {
-                System.out.println("Food ID " + foodId + ": Loaded " + count + " nutrients");
-                System.out.println("  Nutrients: " + nutrients.keySet());
-                // Check for fat content specifically
-                for (Map.Entry<String, Double> entry : nutrients.entrySet()) {
-                    if (entry.getKey().toLowerCase().contains("fat")) {
-                        System.out.println("    FAT FOUND: " + entry.getKey() + " = " + entry.getValue());
-                    }
-                }
             }
         } catch (SQLException e) {
             System.err.println("Error getting nutrients for food " + foodId + ": " + e.getMessage());

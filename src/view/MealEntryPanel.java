@@ -655,19 +655,15 @@ public class MealEntryPanel extends JPanel {
                 // Load meals for current user and today's date
                 List<model.meal.Meal> todaysMeals = databaseAdapter.loadMeals(currentUserId);
                 
-                // Debug: Show all meal dates
-                System.out.println("MealEntryPanel: selectedDate = " + selectedDate);
-                System.out.println("MealEntryPanel: Total meals loaded: " + todaysMeals.size());
-                for (model.meal.Meal meal : todaysMeals) {
-                    System.out.println("MealEntryPanel: Meal ID " + meal.getMealID() + " date: " + meal.getDate());
-                }
-                
                 // Filter meals for today's date
                 List<model.meal.Meal> filteredMeals = todaysMeals.stream()
                     .filter(meal -> meal.getDate().equals(selectedDate))
                     .toList();
                 
-                // Add ALL meals to the table (no filtering)
+                // Create a list to hold all ingredients with their meal types for sorting
+                List<Object[]> ingredientsWithMealType = new ArrayList<>();
+                
+                // Collect all ingredients with their meal types
                 for (model.meal.Meal meal : filteredMeals) {
                     for (model.meal.IngredientEntry ingredient : meal.getIngredients()) {
                         // Find food name by ID
@@ -680,14 +676,34 @@ public class MealEntryPanel extends JPanel {
                             String mealTypeName = meal.getType().name();
                             String formattedMealType = mealTypeName.substring(0, 1).toUpperCase() + mealTypeName.substring(1).toLowerCase();
                             
-                            // Add ALL records to table (no unique filtering)
-                            tableModel.addRow(new Object[]{foodName, formattedQuantity, formattedMealType, 0.0, meal.getMealID()}); // Calories will be calculated later
+                            // Add to list for sorting
+                            ingredientsWithMealType.add(new Object[]{foodName, formattedQuantity, formattedMealType, 0.0, meal.getMealID()});
                         }
                     }
                 }
                 
-                if (!filteredMeals.isEmpty()) {
-                    System.out.println("Loaded " + filteredMeals.size() + " meals for today (showing ALL records)");
+                // Sort by meal type: Breakfast, Lunch, Dinner, Snack
+                ingredientsWithMealType.sort((a, b) -> {
+                    String mealTypeA = (String) a[2];
+                    String mealTypeB = (String) b[2];
+                    
+                    // Define meal type order
+                    Map<String, Integer> mealTypeOrder = Map.of(
+                        "Breakfast", 1,
+                        "Lunch", 2,
+                        "Dinner", 3,
+                        "Snack", 4
+                    );
+                    
+                    int orderA = mealTypeOrder.getOrDefault(mealTypeA, 5);
+                    int orderB = mealTypeOrder.getOrDefault(mealTypeB, 5);
+                    
+                    return Integer.compare(orderA, orderB);
+                });
+                
+                // Add sorted ingredients to table
+                for (Object[] ingredient : ingredientsWithMealType) {
+                    tableModel.addRow(ingredient);
                 }
                 
                 // Update calories display after loading meals
