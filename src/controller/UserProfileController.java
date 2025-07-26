@@ -55,4 +55,13 @@ public class UserProfileController {
                ? profile.getSettings().getUnits() 
                : "Metric"; // default fallback
     }
+
+    public void deleteProfile(int userId) {
+        userProfileDAO.deleteUserProfile(userId);
+        // Remove from manager if it's the current profile
+        UserProfile currentProfile = manager.getCurrentProfile();
+        if (currentProfile != null && currentProfile.getUserID() == userId) {
+            manager.removeCurrentProfile();
+        }
+    }
 }

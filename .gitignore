@@ -23,5 +23,29 @@
 hs_err_pid*
 replay_pid*
 /out/
+
+# IDE files
 /.idea/
+*.iml
+/.metadata/
+/.settings/
+.project
+.classpath
+
+# Build directories
+/target/
 /bin/
+/build/
+
+# Test files (if you don't want to include them)
+/test/
+**/Test*.java
+**/*Test.java
+**/*TestApp.java
+**/*Checker.java
+**/*Debug*.java
+
+# Temporary files
+*.tmp
+*.temp
+*.bak

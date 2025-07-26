@@ -2,6 +2,7 @@ package dao.Implementations;
 
 import dao.adapter.DatabaseAdapter;
 import dao.adapter.MySQLAdapter;
+import dao.adapter.DatabaseManager;
 import dao.interfaces.IMealDAO;
 import model.meal.Meal;
 
@@ -14,8 +15,7 @@ public class MealDAO implements IMealDAO {
     private final DatabaseAdapter adapter;
 
     public MealDAO() {
-        this.adapter = new MySQLAdapter();
-        this.adapter.connect();
+        this.adapter = DatabaseManager.getAdapter();
     }
 
     @Override

@@ -79,4 +79,16 @@ public class UserProfileManager {
     public UserProfile getCurrentProfile() {
         return currentProfile;
     }
+
+    public void removeCurrentProfile() {
+        if (currentProfile != null) {
+            profiles.removeIf(p -> p.getUserID() == currentProfile.getUserID());
+            currentProfile = null;
+        }
+    }
+
+    public void clearCurrentProfile() {
+        // Only clear the current profile reference, don't remove from profiles list
+        currentProfile = null;
+    }
 }

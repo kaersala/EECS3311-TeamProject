@@ -31,6 +31,19 @@ public class Meal {
         return type;
     }
 
+    /**
+     * Accurate calorie calculation using NutritionAnalyzer and food database
+     */
+    public double getCalories(Map<Integer, model.FoodItem> foodDatabase) {
+        backend.NutritionAnalyzer analyzer = new backend.NutritionAnalyzer(foodDatabase);
+        Map<String, Double> nutrients = analyzer.analyzeMeal(this);
+        return nutrients.getOrDefault("Calories", 0.0);
+    }
+
+    /**
+     * Deprecated: Use getCalories(Map<Integer, FoodItem>) instead for accurate calculation
+     */
+    @Deprecated
     public double getCalories() {
         // placeholder for actual calorie calculation
         return 100.0;
