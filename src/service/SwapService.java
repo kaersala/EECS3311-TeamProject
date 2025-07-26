@@ -28,12 +28,13 @@ public class SwapService {
      * Apply swap suggestions to a specific meal
      * @param mealId The meal to modify
      * @param suggestions List of swap suggestions to apply
+     * @param userId The user ID
      * @return Modified meal with applied swaps
      */
-    public Meal applySwapsToMeal(int mealId, List<SwapSuggestion> suggestions) {
+    public Meal applySwapsToMeal(int mealId, List<SwapSuggestion> suggestions, int userId) {
         try {
             // Get original meal
-            Meal originalMeal = getMealById(mealId);
+            Meal originalMeal = getMealById(mealId, userId);
             if (originalMeal == null) {
                 throw new IllegalArgumentException("Meal not found: " + mealId);
             }
@@ -70,7 +71,7 @@ public class SwapService {
             
             for (Meal meal : mealsInRange) {
                 // Apply swaps to each meal
-                Meal modifiedMeal = applySwapsToMeal(meal.getMealID(), suggestions);
+                Meal modifiedMeal = applySwapsToMeal(meal.getMealID(), suggestions, userId);
                 if (modifiedMeal != null) {
                     modifiedCount++;
                 }
@@ -147,10 +148,44 @@ public class SwapService {
         return cumulative;
     }
     
+    /**
+     * Store rollback data for a specific date
+     * @param date The date for which to store rollback data
+     * @param rollbackData The rollback data to store
+     */
+    public void storeRollbackData(String date, String rollbackData) {
+        // Simple implementation - store in memory for now
+        // In a real implementation, this would be stored in database
+        System.out.println("Storing rollback data for date " + date + ": " + rollbackData);
+    }
+    
+    /**
+     * Get rollback data for a specific date
+     * @param date The date for which to get rollback data
+     * @return The rollback data, or null if not found
+     */
+    public String getRollbackData(String date) {
+        // Simple implementation - return null for now
+        // In a real implementation, this would retrieve from database
+        System.out.println("Getting rollback data for date " + date);
+        return null;
+    }
+    
+    /**
+     * Restore original meal from rollback data
+     * @param mealId The meal ID to restore
+     * @param rollbackData The rollback data containing original meal information
+     */
+    public void restoreOriginalMeal(int mealId, String rollbackData) {
+        // Simple implementation - just log for now
+        // In a real implementation, this would restore from rollback data
+        System.out.println("Restoring original meal " + mealId + " with data: " + rollbackData);
+    }
+    
     // Helper methods
-    private Meal getMealById(int mealId) {
+    private Meal getMealById(int mealId, int userId) {
         // Mock implementation - in real app, use DAO
-        return new Meal(mealId, 1, LocalDate.now(), MealType.LUNCH, 
+        return new Meal(mealId, userId, LocalDate.now(), MealType.LUNCH, 
                        Arrays.asList(new IngredientEntry(1, 100)));
     }
     

@@ -787,6 +787,14 @@ public class JournalPanel extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(5, 5));
         panel.setBorder(BorderFactory.createTitledBorder("Food Swap Suggestions"));
         
+        // Check if meals have been swapped before
+        boolean hasBeenSwapped = checkIfMealsHaveBeenSwapped(dailyMeals);
+        
+        if (hasBeenSwapped) {
+            // Show restore options for swapped meals
+            return createRestoreOptionsPanel(dailyMeals);
+        }
+        
         // Get food database for suggestions
         Map<Integer, model.FoodItem> foodDatabase = getFoodDatabase();
         
@@ -844,7 +852,6 @@ public class JournalPanel extends JPanel {
             // Add action buttons
             JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
             JButton applyAllBtn = new JButton("Apply All Suggestions");
-            JButton ignoreBtn = new JButton("Ignore All");
             
             applyAllBtn.addActionListener(e -> {
                 int result = JOptionPane.showConfirmDialog(panel, 
@@ -863,20 +870,204 @@ public class JournalPanel extends JPanel {
                 }
             });
             
-            ignoreBtn.addActionListener(e -> {
-                JOptionPane.showMessageDialog(panel, 
-                    "Suggestions ignored. Your meal records remain unchanged.",
-                    "No Changes Made", 
-                    JOptionPane.INFORMATION_MESSAGE);
-            });
-            
             buttonPanel.add(applyAllBtn);
-            buttonPanel.add(ignoreBtn);
             
             panel.add(buttonPanel, BorderLayout.SOUTH);
         }
         
         return panel;
+    }
+    
+    private boolean checkIfMealsHaveBeenSwapped(List<Meal> dailyMeals) {
+        // Check if any rollback data exists for these meals
+        for (Meal meal : dailyMeals) {
+            String rollbackData = swapService.getRollbackData(meal.getDate().toString());
+            if (rollbackData != null && !rollbackData.isEmpty()) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    private JPanel createRestoreOptionsPanel(List<Meal> dailyMeals) {
+        JPanel panel = new JPanel(new BorderLayout(5, 5));
+        
+        JTextArea infoArea = new JTextArea();
+        infoArea.setEditable(false);
+        infoArea.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        infoArea.setLineWrap(true);
+        infoArea.setWrapStyleWord(true);
+        
+        StringBuilder sb = new StringBuilder();
+        sb.append("Your meals have been modified with swap suggestions.\n\n");
+        sb.append("You can:\n");
+        sb.append("1. Restore original meals for this date\n");
+        sb.append("2. Apply swap suggestions to a date range\n\n");
+        sb.append("Select an option below:");
+        
+        infoArea.setText(sb.toString());
+        
+        JScrollPane scrollPane = new JScrollPane(infoArea);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Add action buttons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton restoreBtn = new JButton("Restore Original Meals");
+        JButton dateRangeBtn = new JButton("Apply to Date Range");
+        
+        restoreBtn.addActionListener(e -> {
+            int result = JOptionPane.showConfirmDialog(panel, 
+                "This will restore your original meals for this date.\n" +
+                "Are you sure you want to restore?",
+                "Confirm Restore", 
+                JOptionPane.YES_NO_OPTION);
+            
+            if (result == JOptionPane.YES_OPTION) {
+                restoreOriginalMeals(dailyMeals);
+            }
+        });
+        
+        dateRangeBtn.addActionListener(e -> {
+            showDateRangeDialog(dailyMeals);
+        });
+        
+        buttonPanel.add(restoreBtn);
+        buttonPanel.add(dateRangeBtn);
+        
+        panel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    private void restoreOriginalMeals(List<Meal> dailyMeals) {
+        try {
+            for (Meal meal : dailyMeals) {
+                String rollbackData = swapService.getRollbackData(meal.getDate().toString());
+                if (rollbackData != null && !rollbackData.isEmpty()) {
+                    // Restore original meal data
+                    swapService.restoreOriginalMeal(meal.getMealID(), rollbackData);
+                }
+            }
+            
+            // Refresh the meals list
+            this.meals = controller.getMealsForUser(userId);
+            if (this.meals == null) {
+                this.meals = new ArrayList<>();
+            }
+            populateDailySummaryTable();
+            
+            JOptionPane.showMessageDialog(this, 
+                "Original meals have been restored!",
+                "Restore Complete", 
+                JOptionPane.INFORMATION_MESSAGE);
+                
+        } catch (Exception e) {
+            System.err.println("Error restoring meals: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, 
+                "Error restoring meals: " + e.getMessage(),
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    
+    private void showDateRangeDialog(List<Meal> dailyMeals) {
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Select Date Range", true);
+        dialog.setLayout(new BorderLayout(10, 10));
+        dialog.setSize(300, 200);
+        dialog.setLocationRelativeTo(this);
+        
+        JPanel panel = new JPanel(new GridLayout(4, 2, 5, 5));
+        
+        panel.add(new JLabel("From Date:"));
+        JTextField fromDateField = new JTextField("YYYY-MM-DD");
+        panel.add(fromDateField);
+        
+        panel.add(new JLabel("To Date:"));
+        JTextField toDateField = new JTextField("YYYY-MM-DD");
+        panel.add(toDateField);
+        
+        JButton applyBtn = new JButton("Apply");
+        JButton cancelBtn = new JButton("Cancel");
+        
+        applyBtn.addActionListener(e -> {
+            try {
+                LocalDate fromDate = LocalDate.parse(fromDateField.getText());
+                LocalDate toDate = LocalDate.parse(toDateField.getText());
+                
+                if (fromDate.isAfter(toDate)) {
+                    JOptionPane.showMessageDialog(dialog, "From date must be before or equal to to date.", "Invalid Date Range", JOptionPane.ERROR_MESSAGE);
+                    return;
+                }
+                
+                applySwapsToDateRange(fromDate, toDate, dailyMeals);
+                dialog.dispose();
+                
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(dialog, "Please enter valid dates in YYYY-MM-DD format.", "Invalid Date Format", JOptionPane.ERROR_MESSAGE);
+            }
+        });
+        
+        cancelBtn.addActionListener(e -> dialog.dispose());
+        
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        buttonPanel.add(applyBtn);
+        buttonPanel.add(cancelBtn);
+        
+        dialog.add(panel, BorderLayout.CENTER);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+        dialog.setVisible(true);
+    }
+    
+    private void applySwapsToDateRange(LocalDate fromDate, LocalDate toDate, List<Meal> originalMeals) {
+        try {
+            // Get swap suggestions from original meals
+            Map<Integer, model.FoodItem> foodDatabase = getFoodDatabase();
+            List<SwapSuggestion> suggestions = generateSmartSwapSuggestions(originalMeals, foodDatabase);
+            
+            if (suggestions.isEmpty()) {
+                JOptionPane.showMessageDialog(this, "No swap suggestions available for the selected date range.", "No Suggestions", JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            
+            // Apply suggestions to all meals in the date range
+            List<Meal> allMeals = controller.getMealsForUser(userId);
+            int appliedCount = 0;
+            
+            for (Meal meal : allMeals) {
+                if (!meal.getDate().isBefore(fromDate) && !meal.getDate().isAfter(toDate)) {
+                    // Apply swaps to this meal
+                    List<SwapSuggestion> mealSuggestions = suggestions.stream()
+                        .filter(s -> s.getOriginal().getFoodID() == meal.getMealID())
+                        .toList();
+                    
+                    if (!mealSuggestions.isEmpty()) {
+                        Meal modifiedMeal = swapService.applySwapsToMeal(meal.getMealID(), mealSuggestions, userId);
+                        if (modifiedMeal != null) {
+                            appliedCount++;
+                        }
+                    }
+                }
+            }
+            
+            // Refresh the meals list
+            this.meals = controller.getMealsForUser(userId);
+            if (this.meals == null) {
+                this.meals = new ArrayList<>();
+            }
+            populateDailySummaryTable();
+            
+            JOptionPane.showMessageDialog(this, 
+                "Applied swap suggestions to " + appliedCount + " meals from " + fromDate + " to " + toDate,
+                "Date Range Applied", 
+                JOptionPane.INFORMATION_MESSAGE);
+                
+        } catch (Exception e) {
+            System.err.println("Error applying to date range: " + e.getMessage());
+            JOptionPane.showMessageDialog(this, 
+                "Error applying to date range: " + e.getMessage(),
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+        }
     }
     
     // Generate smart swap suggestions based on current meals and user goals
@@ -1384,14 +1575,29 @@ public class JournalPanel extends JPanel {
     
     private void applyAllSuggestions(List<Meal> dailyMeals, List<SwapSuggestion> suggestions) {
         try {
+            // Store rollback data before applying changes
+            for (Meal meal : dailyMeals) {
+                String rollbackData = serializeMealForRollback(meal);
+                swapService.storeRollbackData(meal.getDate().toString(), rollbackData);
+            }
+            
             // Apply suggestions to each meal
             for (Meal meal : dailyMeals) {
                 List<SwapSuggestion> mealSuggestions = suggestions.stream()
-                    .filter(s -> s.getOriginal().getFoodID() == meal.getMealID())
+                    .filter(s -> {
+                        // Check if the suggestion's original ingredient exists in this meal
+                        for (model.meal.IngredientEntry ingredient : meal.getIngredients()) {
+                            if (ingredient.getFoodID() == s.getOriginal().getFoodID() && 
+                                ingredient.getQuantity() == s.getOriginal().getQuantity()) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
                     .toList();
                 
                 if (!mealSuggestions.isEmpty()) {
-                    Meal modifiedMeal = swapService.applySwapsToMeal(meal.getMealID(), mealSuggestions);
+                    Meal modifiedMeal = swapService.applySwapsToMeal(meal.getMealID(), mealSuggestions, userId);
                     if (modifiedMeal != null) {
                         System.out.println("Successfully applied swaps to meal " + meal.getMealID());
                     }
@@ -1405,6 +1611,12 @@ public class JournalPanel extends JPanel {
             }
             populateDailySummaryTable();
             
+            // Close the meal details dialog
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window != null) {
+                window.dispose();
+            }
+            
         } catch (Exception e) {
             System.err.println("Error applying suggestions: " + e.getMessage());
             JOptionPane.showMessageDialog(this, 
@@ -1412,6 +1624,23 @@ public class JournalPanel extends JPanel {
                 "Error", 
                 JOptionPane.ERROR_MESSAGE);
         }
+    }
+    
+    private String serializeMealForRollback(Meal meal) {
+        // Simple serialization of meal data for rollback
+        StringBuilder sb = new StringBuilder();
+        sb.append("MealID:").append(meal.getMealID()).append(";");
+        sb.append("UserID:").append(meal.getUserID()).append(";");
+        sb.append("Date:").append(meal.getDate()).append(";");
+        sb.append("Type:").append(meal.getType()).append(";");
+        sb.append("Ingredients:");
+        
+        for (model.meal.IngredientEntry ingredient : meal.getIngredients()) {
+            sb.append(ingredient.getFoodID()).append(",")
+              .append(ingredient.getQuantity()).append(";");
+        }
+        
+        return sb.toString();
     }
 }
 
