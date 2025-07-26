@@ -10,6 +10,8 @@ import model.meal.MealType;
 import java.time.LocalDate;
 import java.util.List;
 
+import backend.SwapEngine;
+
 public class MealLoggerController implements IMealLogger {
     private final IMealDAO mealDAO = new MealDAO();
 
@@ -43,4 +45,9 @@ public class MealLoggerController implements IMealLogger {
     public void updateMeal(Meal meal) {
         mealDAO.saveMeal(meal);
     }
+    
+    public SwapEngine getSwapEngine() {
+        return new SwapEngine(); // Uses strategies internally
+    }
+
 } 

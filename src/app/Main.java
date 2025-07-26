@@ -287,61 +287,58 @@ public class Main {
         swapFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         swapFrame.setSize(800, 600);
         swapFrame.setLocationRelativeTo(null);
-        
-        // Create a simple swap interface
+
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        
+//swap
         JLabel titleLabel = new JLabel("Food Swap Suggestions", SwingConstants.CENTER);
         titleLabel.setFont(new Font("Arial", Font.BOLD, 18));
         panel.add(titleLabel, BorderLayout.NORTH);
-        
-        // Swap suggestions based on goals
+
+        Map<Integer, FoodItem> foodDatabase = new HashMap<>();
+        foodDatabase.put(1, new FoodItem(1, "Beef Steak", 250, Map.of("Calories", 250.0, "Protein", 26.0, "Fat", 15.0), "Meat"));
+        foodDatabase.put(2, new FoodItem(2, "Chicken Breast", 165, Map.of("Calories", 165.0, "Protein", 31.0, "Fat", 3.6), "Meat"));
+        foodDatabase.put(3, new FoodItem(3, "Lentils", 120, Map.of("Calories", 120.0, "Protein", 9.0, "Fiber", 8.0), "Legume"));
+
+       
+        List<IngredientEntry> currentMeal = List.of(new IngredientEntry(1, 100)); // 100g beef
+
+      
+        Goal goal = new Goal("Calories", "Decrease", 1.5, "High");
+        List<Goal> goals = List.of(goal);
+
+    
+        SwapEngine engine = new SwapEngine();
+        List<SwapSuggestion> suggestions = engine.generateSwaps(goals, currentMeal, foodDatabase);
+
+       
         JTextArea swapArea = new JTextArea();
         swapArea.setEditable(false);
-        swapArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
-        
-        StringBuilder suggestions = new StringBuilder();
-        suggestions.append("Based on your goals, here are some swap suggestions:\n\n");
-        
-        if (userGoals != null && !userGoals.isEmpty()) {
-            for (Goal goal : userGoals) {
-                switch (goal.getNutrient()) {
-                    case "Calories":
-                        suggestions.append("• Replace beef steak with chicken breast (save 85 calories)\n");
-                        break;
-                    case "Fiber":
-                        suggestions.append("• Replace white rice with brown rice (add 1.4g fiber)\n");
-                        break;
-                    case "Protein":
-                        suggestions.append("• Replace regular yogurt with Greek yogurt (add 7.4g protein)\n");
-                        break;
-                    case "Sodium":
-                        suggestions.append("• Replace canned vegetables with fresh vegetables (reduce sodium)\n");
-                        break;
-                    case "Fat":
-                        suggestions.append("• Replace full-fat milk with skim milk (reduce fat)\n");
-                        break;
-                }
-            }
-        } else {
-            suggestions.append("• Replace beef steak with chicken breast (save 85 calories)\n");
-            suggestions.append("• Replace white rice with brown rice (add 1.4g fiber)\n");
-            suggestions.append("• Replace regular yogurt with Greek yogurt (add 7.4g protein)\n");
+        swapArea.setFont(new Font("Monospaced", Font.PLAIN, 14));
+
+       
+        StringBuilder sb = new StringBuilder("Swap Suggestions:\n\n");
+        for (SwapSuggestion s : suggestions) {
+            FoodItem original = foodDatabase.get(s.getOriginal().getFoodID());
+            FoodItem replacement = foodDatabase.get(s.getReplacement().getFoodID());
+            sb.append("• Replace ")
+              .append(original.getName())
+              .append(" with ")
+              .append(replacement.getName())
+              .append(" → ")
+              .append(s.getReason())
+              .append("\n");
         }
-        
-        suggestions.append("\nThese swaps will help you meet your nutritional goals!");
-        swapArea.setText(suggestions.toString());
-        
-        panel.add(new JScrollPane(swapArea), BorderLayout.CENTER);
-        
-        JButton backBtn = new JButton("Back to Main Menu");
-        backBtn.addActionListener(e -> swapFrame.dispose());
-        panel.add(backBtn, BorderLayout.SOUTH);
-        
+        swapArea.setText(sb.toString());
+
+        // ✅ Add the text area to scroll pane and panel
+        JScrollPane scrollPane = new JScrollPane(swapArea);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
         swapFrame.add(panel);
         swapFrame.setVisible(true);
     }
+
     
     private static void showCharts() {
         JFrame chartsFrame = new JFrame("Nutrition Charts");
