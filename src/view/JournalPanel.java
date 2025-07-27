@@ -16,6 +16,9 @@ import view.MealEntryPanel;
 import javax.swing.*;
 import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.DefaultCellEditor;
+
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
@@ -28,6 +31,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
+
+import controller.IMealLogger;
+import model.meal.IngredientEntry;
+import model.FoodItem;
+import dao.adapter.DatabaseAdapter;
+import dao.adapter.DatabaseManager;
+import dao.Implementations.MealDAO;
 
 public class JournalPanel extends JPanel {
     private JTable table;
@@ -55,10 +66,23 @@ public class JournalPanel extends JPanel {
         new Color(211, 84, 0)      // Dark Orange
     };
 
+    private MealDAO mealDAO;
+
     public JournalPanel(int userId) {
         this.userId = userId;
         setLayout(new BorderLayout(10, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Initialize SwapService with database adapter
+        dao.adapter.DatabaseAdapter databaseAdapter = dao.adapter.DatabaseManager.getAdapter();
+        if (databaseAdapter != null) {
+            swapService = new SwapService();
+            swapService.setDatabaseAdapter(databaseAdapter);
+            mealDAO = new MealDAO();
+            System.out.println("SwapService and MealDAO initialized with database adapter in JournalPanel");
+        } else {
+            System.err.println("Warning: DatabaseAdapter is null, SwapService not properly initialized");
+        }
         
         // Load user's actual goals from database
         loadUserGoals();
@@ -80,21 +104,23 @@ public class JournalPanel extends JPanel {
             userGoals = goalDAO.loadGoals(userId);
             
             if (userGoals == null || userGoals.isEmpty()) {
-                // Fallback to default goals if none set
+                // Fallback to default goals if none set - only Fiber, no Calories
                 userGoals = Arrays.asList(
-                    new Goal("Fiber", "Increase", 5.0, "moderate"),
-                    new Goal("Calories", "Decrease", 200.0, "low")
+                    new Goal("Fiber", "Increase", 5.0, "moderate")
                 );
-                System.out.println("No goals found for user " + userId + ", using default goals");
+                System.out.println("No goals found for user " + userId + ", using default Fiber goal only");
             } else {
                 System.out.println("Loaded " + userGoals.size() + " goals for user " + userId);
+                // Debug: print loaded goals
+                for (Goal goal : userGoals) {
+                    System.out.println("  Goal: " + goal.getNutrient() + " " + goal.getDirection() + " by " + goal.getAmount());
+                }
             }
         } catch (Exception e) {
             System.err.println("Error loading user goals: " + e.getMessage());
-            // Fallback to default goals
+            // Fallback to default goals - only Fiber, no Calories
             userGoals = Arrays.asList(
-                new Goal("Fiber", "Increase", 5.0, "moderate"),
-                new Goal("Calories", "Decrease", 200.0, "low")
+                new Goal("Fiber", "Increase", 5.0, "moderate")
             );
         }
     }
@@ -119,11 +145,11 @@ public class JournalPanel extends JPanel {
         topPanel.add(backToMainBtn);
         add(topPanel, BorderLayout.SOUTH);
 
-        // Table setup - Daily summary view
-        String[] columns = {"Date", "Total Calories", "Target Calories", "Status"};
+        // Table setup - Daily summary view with Delete column
+        String[] columns = {"Date", "Total Calories", "Target Calories", "Status", "Delete"};
         tableModel = new DefaultTableModel(columns, 0) {
             public boolean isCellEditable(int row, int col) {
-                return false;
+                return col == 4; // Only Delete column is editable
             }
         };
 
@@ -136,9 +162,16 @@ public class JournalPanel extends JPanel {
         table.getTableHeader().setFont(new Font("SansSerif", Font.BOLD, 14));
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
+        // Set up Delete button renderer and editor
+        table.getColumnModel().getColumn(4).setCellRenderer(new DeleteButtonRenderer());
+        table.getColumnModel().getColumn(4).setCellEditor(new DeleteButtonEditor());
+
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting() && table.getSelectedRow() != -1) {
-                showDailyMealDetails(table.getSelectedRow());
+                // Don't show meal details if clicking on Delete column
+                if (table.getSelectedColumn() != 4) {
+                    showDailyMealDetails(table.getSelectedRow());
+                }
             }
         });
 
@@ -200,7 +233,8 @@ public class JournalPanel extends JPanel {
                 date.toString(),
                 String.format("%.0f", totalCalories),
                 String.format("%.0f", targetCalories),
-                status
+                status,
+                new JCheckBox()
             });
         }
     }
@@ -552,7 +586,7 @@ public class JournalPanel extends JPanel {
             .sum();
         
         // Create summary panel
-        JPanel summaryPanel = new JPanel(new GridLayout(4, 1, 10, 10));
+        JPanel summaryPanel = new JPanel(new GridLayout(5, 1, 10, 10));
         
         JLabel caloriesLabel = new JLabel("Total Calories: " + String.format("%.0f", totalCalories));
         caloriesLabel.setFont(new Font("Arial", Font.BOLD, 16));
@@ -571,8 +605,52 @@ public class JournalPanel extends JPanel {
         mealsLabel.setFont(new Font("Arial", Font.PLAIN, 14));
         summaryPanel.add(mealsLabel);
         
+        // Add "Go to Log Meal" button
+        JButton goToLogMealBtn = new JButton("Go to Log Meal");
+        goToLogMealBtn.setFont(new Font("Arial", Font.BOLD, 12));
+        goToLogMealBtn.setBackground(new Color(52, 152, 219));
+        goToLogMealBtn.setForeground(Color.WHITE);
+        goToLogMealBtn.setFocusPainted(false);
+        
+        goToLogMealBtn.addActionListener(e -> {
+            // Close current dialog
+            Window window = SwingUtilities.getWindowAncestor(panel);
+            if (window != null) {
+                window.dispose();
+            }
+            
+            // Open MealEntryPanel for the specific date
+            if (!dailyMeals.isEmpty()) {
+                LocalDate targetDate = dailyMeals.get(0).getDate();
+                openMealEntryPanel(targetDate);
+            }
+        });
+        
+        summaryPanel.add(goToLogMealBtn);
+        
         panel.add(summaryPanel, BorderLayout.CENTER);
         return panel;
+    }
+    
+    private void openMealEntryPanel(LocalDate date) {
+        JFrame mealFrame = new JFrame("Log Meal");
+        mealFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        mealFrame.setSize(800, 600);
+        mealFrame.setLocationRelativeTo(null);
+        
+        MealEntryPanel mealEntryPanel = new MealEntryPanel(userId);
+        mealEntryPanel.setSelectedDate(date); // Set the specific date
+        
+        // Add a back button
+        JButton backBtn = new JButton("Back to Journal");
+        backBtn.addActionListener(e -> mealFrame.dispose());
+        
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.add(mealEntryPanel, BorderLayout.CENTER);
+        panel.add(backBtn, BorderLayout.SOUTH);
+        
+        mealFrame.add(panel);
+        mealFrame.setVisible(true);
     }
     
     private Map<String, Double> calculateFoodGroupDistribution(List<Meal> dailyMeals) {
@@ -790,13 +868,139 @@ public class JournalPanel extends JPanel {
         // Check if meals have been swapped before
         boolean hasBeenSwapped = checkIfMealsHaveBeenSwapped(dailyMeals);
         
-        if (hasBeenSwapped) {
-            // Show restore options for swapped meals
-            return createRestoreOptionsPanel(dailyMeals);
-        }
-        
         // Get food database for suggestions
         Map<Integer, model.FoodItem> foodDatabase = getFoodDatabase();
+        
+        if (hasBeenSwapped) {
+            // For swapped meals, show both the original suggestions and restore options
+            JPanel combinedPanel = new JPanel(new BorderLayout(5, 5));
+            
+            // Show what was originally suggested
+            JTextArea originalSuggestionsArea = new JTextArea();
+            originalSuggestionsArea.setEditable(false);
+            originalSuggestionsArea.setFont(new Font("SansSerif", Font.PLAIN, 12));
+            originalSuggestionsArea.setLineWrap(true);
+            originalSuggestionsArea.setWrapStyleWord(true);
+            
+            StringBuilder sb = new StringBuilder();
+            sb.append("Original Swap Suggestions Applied:\n\n");
+            sb.append("The following changes were made to improve your nutrition:\n\n");
+            
+            // Get the original rollback data to show what was changed
+            for (Meal meal : dailyMeals) {
+                System.out.println("DEBUG: Checking meal " + meal.getType() + " (ID: " + meal.getMealID() + ") for original data");
+                
+                // Get original meal data for this specific meal
+                String originalMealData = swapService.getOriginalMealData(meal.getMealID(), userId, meal.getDate());
+                if (originalMealData != null && !originalMealData.isEmpty()) {
+                    // Debug: print the actual original meal data
+                    System.out.println("DEBUG: Original meal data for " + meal.getType() + ": " + originalMealData);
+                    System.out.println("DEBUG: Data starts with 'ORIGINAL:': " + originalMealData.startsWith("ORIGINAL:"));
+                    System.out.println("DEBUG: Data length: " + originalMealData.length());
+                    
+                    // Parse original meal data to show original vs current
+                    try {
+                        // Parse the original meal data format: ORIGINAL:FOOD_ID,QUANTITY;FOOD_ID,QUANTITY
+                        if (originalMealData.startsWith("ORIGINAL:")) {
+                            String ingredientsData = originalMealData.substring("ORIGINAL:".length());
+                            System.out.println("DEBUG: Ingredients data: " + ingredientsData);
+                            
+                            String originalFoodName = "Unknown";
+                            String originalQuantity = "0";
+                            
+                            if (!ingredientsData.isEmpty()) {
+                                // Get the first ingredient (assuming single ingredient meals for simplicity)
+                                String[] ingredientParts = ingredientsData.split(";");
+                                if (ingredientParts.length > 0) {
+                                    String firstIngredient = ingredientParts[0];
+                                    String[] parts = firstIngredient.split(",");
+                                    System.out.println("DEBUG: Ingredient parts: " + Arrays.toString(parts));
+                                    
+                                    if (parts.length >= 2) {
+                                        int originalFoodId = Integer.parseInt(parts[0]);
+                                        originalQuantity = parts[1];
+                                        
+                                        System.out.println("DEBUG: Original Food ID: " + originalFoodId + ", Quantity: " + originalQuantity);
+                                        
+                                        // Get original food name from database
+                                        model.FoodItem originalFood = foodDatabase.get(originalFoodId);
+                                        originalFoodName = originalFood != null ? originalFood.getName() : "Food ID " + originalFoodId;
+                                        
+                                        System.out.println("DEBUG: Original food name: " + originalFoodName);
+                                    }
+                                }
+                            }
+                            
+                            // Get current food info
+                            model.FoodItem currentFood = null;
+                            String currentFoodName = "Unknown";
+                            String currentQuantity = "0";
+                            
+                            if (!meal.getIngredients().isEmpty()) {
+                                currentFood = foodDatabase.get(meal.getIngredients().get(0).getFoodID());
+                                currentFoodName = currentFood != null ? currentFood.getName() : "Food ID " + meal.getIngredients().get(0).getFoodID();
+                                currentQuantity = String.valueOf(meal.getIngredients().get(0).getQuantity());
+                            }
+                            
+                            sb.append("• ").append(meal.getType()).append(":\n");
+                            sb.append("  Original: ").append(originalFoodName).append(" (").append(originalQuantity).append("g)\n");
+                            sb.append("  Current:  ").append(currentFoodName).append(" (").append(currentQuantity).append("g)\n\n");
+                        } else {
+                            sb.append("• ").append(meal.getType()).append(": Invalid original meal data format\n");
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error parsing original meal data: " + e.getMessage());
+                        e.printStackTrace();
+                        sb.append("• ").append(meal.getType()).append(": Swapped for better nutrition\n");
+                    }
+                } else {
+                    System.out.println("DEBUG: No original meal data found for " + meal.getType());
+                    sb.append("• ").append(meal.getType()).append(": No original meal data available\n");
+                }
+            }
+            
+            sb.append("\nCurrent status: Meals have been swapped to improve nutrition based on your goals.\n\n");
+            sb.append("You can:\n");
+            sb.append("1. Restore original meals for this date (revert to original food items)\n");
+            sb.append("2. Apply swap suggestions to a date range (apply same swaps to other dates)\n\n");
+            sb.append("Select an option below:");
+            
+            originalSuggestionsArea.setText(sb.toString());
+            
+            JScrollPane scrollPane = new JScrollPane(originalSuggestionsArea);
+            combinedPanel.add(scrollPane, BorderLayout.CENTER);
+            
+            // Add action buttons
+            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+            JButton restoreBtn = new JButton("Restore Original Meals");
+            JButton dateRangeBtn = new JButton("Apply to Date Range");
+            
+            restoreBtn.addActionListener(e -> {
+                String[] options = {"Yes", "No"};
+                int result = JOptionPane.showOptionDialog(panel,
+                    "This will restore your original meals for this date.\nAre you sure you want to restore?",
+                    "Confirm Restore",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    options,
+                    options[0]
+                );
+                if (result == JOptionPane.YES_OPTION) {
+                    restoreOriginalMeals(dailyMeals);
+                }
+            });
+            
+            dateRangeBtn.addActionListener(e -> {
+                showDateRangeDialog(dailyMeals);
+            });
+            
+            buttonPanel.add(restoreBtn);
+            buttonPanel.add(dateRangeBtn);
+            
+            combinedPanel.add(buttonPanel, BorderLayout.SOUTH);
+            return combinedPanel;
+        }
         
         // Generate swap suggestions based on current meals and goals
         List<SwapSuggestion> allSuggestions = generateSmartSwapSuggestions(dailyMeals, foodDatabase);
@@ -854,18 +1058,21 @@ public class JournalPanel extends JPanel {
             JButton applyAllBtn = new JButton("Apply All Suggestions");
             
             applyAllBtn.addActionListener(e -> {
-                int result = JOptionPane.showConfirmDialog(panel, 
-                    "This will modify your meal records in the database.\n" +
-                    "Are you sure you want to apply all suggestions?",
-                    "Confirm Changes", 
-                    JOptionPane.YES_NO_OPTION);
-                
+                String[] options = {"Yes", "No"};
+                int result = JOptionPane.showOptionDialog(panel,
+                    "This will modify your meal records in the database.\nAre you sure you want to apply all suggestions?",
+                    "Confirm Changes",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    options,
+                    options[0]
+                );
                 if (result == JOptionPane.YES_OPTION) {
                     applyAllSuggestions(dailyMeals, allSuggestions);
-                    JOptionPane.showMessageDialog(panel, 
-                        "All suggestions have been applied!\n" +
-                        "Your meal records have been updated in the database.",
-                        "Changes Applied", 
+                    JOptionPane.showMessageDialog(panel,
+                        "All suggestions have been applied!\nYour meal records have been updated in the database.",
+                        "Changes Applied",
                         JOptionPane.INFORMATION_MESSAGE);
                 }
             });
@@ -900,9 +1107,10 @@ public class JournalPanel extends JPanel {
         
         StringBuilder sb = new StringBuilder();
         sb.append("Your meals have been modified with swap suggestions.\n\n");
+        sb.append("Current status: Meals have been swapped to improve nutrition based on your goals.\n\n");
         sb.append("You can:\n");
-        sb.append("1. Restore original meals for this date\n");
-        sb.append("2. Apply swap suggestions to a date range\n\n");
+        sb.append("1. Restore original meals for this date (revert to original food items)\n");
+        sb.append("2. Apply swap suggestions to a date range (apply same swaps to other dates)\n\n");
         sb.append("Select an option below:");
         
         infoArea.setText(sb.toString());
@@ -916,12 +1124,16 @@ public class JournalPanel extends JPanel {
         JButton dateRangeBtn = new JButton("Apply to Date Range");
         
         restoreBtn.addActionListener(e -> {
-            int result = JOptionPane.showConfirmDialog(panel, 
-                "This will restore your original meals for this date.\n" +
-                "Are you sure you want to restore?",
-                "Confirm Restore", 
-                JOptionPane.YES_NO_OPTION);
-            
+            String[] options = {"Yes", "No"};
+            int result = JOptionPane.showOptionDialog(panel,
+                "This will restore your original meals for this date.\nAre you sure you want to restore?",
+                "Confirm Restore",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]
+            );
             if (result == JOptionPane.YES_OPTION) {
                 restoreOriginalMeals(dailyMeals);
             }
@@ -941,31 +1153,71 @@ public class JournalPanel extends JPanel {
     
     private void restoreOriginalMeals(List<Meal> dailyMeals) {
         try {
+            System.out.println("DEBUG: Starting restore process for " + dailyMeals.size() + " meals");
+            
             for (Meal meal : dailyMeals) {
-                String rollbackData = swapService.getRollbackData(meal.getDate().toString());
-                if (rollbackData != null && !rollbackData.isEmpty()) {
-                    // Restore original meal data
-                    swapService.restoreOriginalMeal(meal.getMealID(), rollbackData);
+                // Get original meal data for this specific meal
+                String originalMealData = swapService.getOriginalMealData(meal.getMealID(), userId, meal.getDate());
+                if (originalMealData != null && !originalMealData.isEmpty()) {
+                    System.out.println("DEBUG: Found original meal data for " + meal.getType() + ": " + originalMealData);
+                    
+                    // Parse original meal data and restore
+                    if (originalMealData.startsWith("ORIGINAL:")) {
+                        String ingredientsData = originalMealData.substring("ORIGINAL:".length());
+                        System.out.println("DEBUG: Ingredients data: " + ingredientsData);
+                        
+                        if (!ingredientsData.isEmpty()) {
+                            // Get the first ingredient (assuming single ingredient meals for simplicity)
+                            String[] ingredientParts = ingredientsData.split(";");
+                            if (ingredientParts.length > 0) {
+                                String firstIngredient = ingredientParts[0];
+                                String[] parts = firstIngredient.split(",");
+                                System.out.println("DEBUG: Ingredient parts: " + Arrays.toString(parts));
+                                
+                                if (parts.length >= 2) {
+                                    int originalFoodId = Integer.parseInt(parts[0]);
+                                    double originalQuantity = Double.parseDouble(parts[1]);
+                                    
+                                    System.out.println("DEBUG: Restoring meal " + meal.getMealID() + " to FoodID: " + originalFoodId + ", Quantity: " + originalQuantity);
+                                    
+                                    // Create new ingredient list with original data
+                                    List<IngredientEntry> originalIngredients = new ArrayList<>();
+                                    originalIngredients.add(new IngredientEntry(originalFoodId, originalQuantity));
+                                    
+                                    // Create restored meal
+                                    Meal restoredMeal = new Meal(meal.getMealID(), meal.getUserID(), meal.getDate(), meal.getType(), originalIngredients);
+                                    
+                                    // Update in database
+                                    mealDAO.updateMeal(restoredMeal);
+                                    
+                                    // Mark as restored
+                                    swapService.markMealAsRestored(meal.getMealID(), userId);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    System.out.println("DEBUG: No original meal data found for " + meal.getType() + ", skipping restore");
                 }
             }
             
-            // Refresh the meals list
-            this.meals = controller.getMealsForUser(userId);
-            if (this.meals == null) {
-                this.meals = new ArrayList<>();
-            }
-            populateDailySummaryTable();
-            
-            JOptionPane.showMessageDialog(this, 
+            JOptionPane.showMessageDialog(this,
                 "Original meals have been restored!",
-                "Restore Complete", 
+                "Restore Complete",
                 JOptionPane.INFORMATION_MESSAGE);
-                
+
+            // Close the current dialog
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window != null) {
+                window.dispose();
+            }
+            
         } catch (Exception e) {
-            System.err.println("Error restoring meals: " + e.getMessage());
-            JOptionPane.showMessageDialog(this, 
+            System.err.println("Error restoring original meals: " + e.getMessage());
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this,
                 "Error restoring meals: " + e.getMessage(),
-                "Error", 
+                "Restore Error",
                 JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -1116,9 +1368,8 @@ public class JournalPanel extends JPanel {
             allSuggestions.addAll(mealSuggestions);
         }
         
-        // Save suggestions to MealEntryPanel for tomorrow's use
-        view.MealEntryPanel.setYesterdaySwapSuggestions(mealTypeSuggestions);
-        System.out.println("Saved " + mealTypeSuggestions.size() + " meal type suggestions to MealEntryPanel");
+        // Note: Suggestions generated for current meals
+        System.out.println("Generated " + mealTypeSuggestions.size() + " meal type suggestions");
         
         System.out.println("Total suggestions generated: " + allSuggestions.size());
         System.out.println("=== END SWAP DEBUG ===");
@@ -1130,12 +1381,19 @@ public class JournalPanel extends JPanel {
     private SwapSuggestion generateSmartSuggestion(model.FoodItem currentFood, model.meal.IngredientEntry ingredient, 
                                                    Map<Integer, model.FoodItem> foodDatabase, Set<Integer> usedAlternatives) {
         if (userGoals == null || userGoals.isEmpty()) {
+            System.out.println("    No user goals found, returning null");
             return null;
+        }
+        
+        System.out.println("    Checking " + userGoals.size() + " user goals:");
+        for (Goal goal : userGoals) {
+            System.out.println("      - " + goal.getNutrient() + " " + goal.getDirection() + " by " + goal.getAmount());
         }
         
         // Get current food's nutrients
         Map<String, Double> currentNutrients = currentFood.getNutrients();
         if (currentNutrients == null) {
+            System.out.println("    Current food has no nutrients, returning null");
             return null;
         }
         
@@ -1158,7 +1416,10 @@ public class JournalPanel extends JPanel {
                 usedAlternatives, goal, targetNutrient, direction, currentValue, currentNutrients, false);
             
             if (bestUnusedSuggestion != null) {
+                System.out.println("    Found unused suggestion for " + targetNutrient);
                 allSuggestions.add(bestUnusedSuggestion);
+            } else {
+                System.out.println("    No unused suggestion found for " + targetNutrient);
             }
             
             // If no unused alternatives found, try used ones (allow repetition)
@@ -1166,7 +1427,10 @@ public class JournalPanel extends JPanel {
                 usedAlternatives, goal, targetNutrient, direction, currentValue, currentNutrients, true);
             
             if (bestUsedSuggestion != null) {
+                System.out.println("    Found used suggestion for " + targetNutrient);
                 allSuggestions.add(bestUsedSuggestion);
+            } else {
+                System.out.println("    No used suggestion found for " + targetNutrient);
             }
         }
         
@@ -1200,11 +1464,11 @@ public class JournalPanel extends JPanel {
         double bestValue = direction.equals("increase") ? currentValue : Double.MAX_VALUE;
         double currentCalories = calculateCaloriesFromMacros(currentNutrients);
         
-        // First try with ±10% calorie range
+        // First try with ?10% calorie range
         bestAlternative = findAlternativeInCalorieRange(currentFood, foodDatabase, usedAlternatives, 
             goal, targetNutrient, direction, currentValue, currentCalories, 0.1, allowUsed);
         
-        // If no alternative found with ±10%, try ±30%
+        // If no alternative found with ?10%, try ?30%
         if (bestAlternative == null) {
             bestAlternative = findAlternativeInCalorieRange(currentFood, foodDatabase, usedAlternatives, 
                 goal, targetNutrient, direction, currentValue, currentCalories, 0.3, allowUsed);
@@ -1277,7 +1541,7 @@ public class JournalPanel extends JPanel {
             // Skip if calories are 0 or too low (likely calculation error)
             if (altCalories <= 0) continue;
             
-            // Check calorie range (±10% or ±30%) - according to use case requirements to keep other nutrients constant
+            // Check calorie range (?10% or ?30%) - according to use case requirements to keep other nutrients constant
             boolean inCalorieRange = altCalories >= currentCalories * (1 - calorieRange) && 
                                    altCalories <= currentCalories * (1 + calorieRange);
             
@@ -1501,7 +1765,7 @@ public class JournalPanel extends JPanel {
             }
         }
         double totalCalories = carbs * 4.0 + protein * 4.0 + fat * 9.0;
-        System.out.println("      Calculated calories: carbs(" + carbs + "×4) + protein(" + protein + "×4) + fat(" + fat + "×9) = " + totalCalories);
+        System.out.println("      Calculated calories: carbs(" + carbs + "?4) + protein(" + protein + "?4) + fat(" + fat + "?9) = " + totalCalories);
         // Return as long as one macronutrient is greater than 0
         if (carbs > 0 || protein > 0 || fat > 0) {
             return totalCalories;
@@ -1577,8 +1841,9 @@ public class JournalPanel extends JPanel {
         try {
             // Store rollback data before applying changes
             for (Meal meal : dailyMeals) {
-                String rollbackData = serializeMealForRollback(meal);
-                swapService.storeRollbackData(meal.getDate().toString(), rollbackData);
+                List<Meal> mealList = new ArrayList<>();
+                mealList.add(meal);
+                swapService.storeRollbackData(meal.getDate().toString(), mealList);
             }
             
             // Apply suggestions to each meal
@@ -1632,7 +1897,7 @@ public class JournalPanel extends JPanel {
         sb.append("MealID:").append(meal.getMealID()).append(";");
         sb.append("UserID:").append(meal.getUserID()).append(";");
         sb.append("Date:").append(meal.getDate()).append(";");
-        sb.append("Type:").append(meal.getType()).append(";");
+        sb.append("Type:").append(meal.getType().name()).append(";");
         sb.append("Ingredients:");
         
         for (model.meal.IngredientEntry ingredient : meal.getIngredients()) {
@@ -1641,6 +1906,124 @@ public class JournalPanel extends JPanel {
         }
         
         return sb.toString();
+    }
+    
+    // Delete button renderer
+    private class DeleteButtonRenderer extends JButton implements TableCellRenderer {
+        public DeleteButtonRenderer() {
+            setOpaque(true);
+        }
+        
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value,
+                                                      boolean isSelected, boolean hasFocus,
+                                                      int row, int column) {
+            setText("Delete");
+            setBackground(new Color(231, 76, 60)); // Red color
+            setForeground(Color.WHITE);
+            setFont(new Font("Arial", Font.BOLD, 12));
+            setFocusPainted(false);
+            return this;
+        }
+    }
+    
+    // Delete button editor
+    private class DeleteButtonEditor extends DefaultCellEditor {
+        private JButton button;
+        private String label;
+        private boolean isPushed;
+        
+        public DeleteButtonEditor() {
+            super(new JCheckBox());
+            button = new JButton();
+            button.setOpaque(true);
+            button.addActionListener(e -> fireEditingStopped());
+        }
+        
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value,
+                                                   boolean isSelected, int row, int column) {
+            label = "Delete";
+            button.setText(label);
+            button.setBackground(new Color(231, 76, 60)); // Red color
+            button.setForeground(Color.WHITE);
+            button.setFont(new Font("Arial", Font.BOLD, 12));
+            isPushed = true;
+            return button;
+        }
+        
+        @Override
+        public Object getCellEditorValue() {
+            if (isPushed) {
+                // Get the date from the table
+                String dateStr = (String) table.getValueAt(table.getSelectedRow(), 0);
+                LocalDate date = LocalDate.parse(dateStr);
+                
+                // Confirm deletion
+                int result = JOptionPane.showConfirmDialog(
+                    SwingUtilities.getWindowAncestor(table),
+                    "Are you sure you want to delete all meals for " + dateStr + "?",
+                    "Confirm Deletion",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.WARNING_MESSAGE
+                );
+                
+                if (result == JOptionPane.YES_OPTION) {
+                    deleteMealsForDate(date);
+                }
+            }
+            isPushed = false;
+            return label;
+        }
+        
+        @Override
+        public boolean stopCellEditing() {
+            isPushed = false;
+            return super.stopCellEditing();
+        }
+    }
+    
+    private void deleteMealsForDate(LocalDate date) {
+        try {
+            // Get all meals for the date
+            List<Meal> mealsToDelete = meals.stream()
+                .filter(meal -> meal.getDate().equals(date))
+                .toList();
+            
+            if (mealsToDelete.isEmpty()) {
+                JOptionPane.showMessageDialog(this, 
+                    "No meals found for " + date,
+                    "No Meals", 
+                    JOptionPane.INFORMATION_MESSAGE);
+                return;
+            }
+            
+            // Delete meals from database using the new method
+            dao.Implementations.MealDAO mealDAO = new dao.Implementations.MealDAO();
+            mealDAO.deleteMealsByDate(userId, date.toString());
+            
+            // Refresh the meals list from database
+            this.meals = controller.getMealsForUser(userId);
+            if (this.meals == null) {
+                this.meals = new ArrayList<>();
+            }
+            
+            // Refresh the table
+            populateDailySummaryTable();
+            
+            JOptionPane.showMessageDialog(this, 
+                "Successfully deleted " + mealsToDelete.size() + " meals for " + date + " from database.",
+                "Deletion Complete", 
+                JOptionPane.INFORMATION_MESSAGE);
+                
+        } catch (Exception e) {
+            System.err.println("Error deleting meals: " + e.getMessage());
+            e.printStackTrace();
+            JOptionPane.showMessageDialog(this, 
+                "Error deleting meals: " + e.getMessage(),
+                "Error", 
+                JOptionPane.ERROR_MESSAGE);
+        }
     }
 }
 

@@ -1,35 +1,60 @@
 package service;
 
-import model.*;
-import model.meal.*;
-import dao.interfaces.IMealDAO;
-import dao.Implementations.MealDAO;
 import backend.SwapEngine;
-import java.util.*;
-import java.time.LocalDate;
+import dao.Implementations.MealDAO;
+import dao.Implementations.SwapStatusDAO;
+import dao.adapter.DatabaseAdapter;
+import dao.adapter.MySQLAdapter;
+import model.Goal;
+import model.meal.IngredientEntry;
+import model.meal.Meal;
+import model.meal.MealType;
+import model.SwapSuggestion;
+import model.FoodItem;
 
-/**
- * Service class for handling food swap operations
- * Implements the swap functionality as described in the use cases
- */
+import java.time.LocalDate;
+import java.util.*;
+
 public class SwapService {
     private SwapEngine swapEngine;
-    private IMealDAO mealDAO;
+    private MealDAO mealDAO;
+    private SwapStatusDAO swapStatusDAO;
     private Map<Integer, FoodItem> foodDatabase;
     
     public SwapService() {
         this.swapEngine = new SwapEngine();
         this.mealDAO = new MealDAO();
+        
+        // Use the existing database adapter from Main.java
+        // This will be set later via setDatabaseAdapter method
+        this.swapStatusDAO = null; // Will be initialized when database adapter is set
+        
         this.foodDatabase = new HashMap<>(); // In real app, load from database
         initializeMockFoodDatabase();
     }
     
     /**
-     * Apply swap suggestions to a specific meal
-     * @param mealId The meal to modify
+     * Set the database adapter for swap status operations
+     * This should be called after the database connection is established
+     */
+    public void setDatabaseAdapter(DatabaseAdapter databaseAdapter) {
+        System.out.println("=== SwapService.setDatabaseAdapter called ===");
+        System.out.println("DatabaseAdapter: " + (databaseAdapter != null ? "NOT NULL" : "NULL"));
+        
+        if (databaseAdapter != null) {
+            this.swapStatusDAO = new SwapStatusDAO(databaseAdapter);
+            System.out.println("SwapStatusDAO initialized successfully");
+        } else {
+            System.out.println("Warning: DatabaseAdapter is null, SwapStatusDAO not initialized");
+        }
+    }
+    
+    /**
+     * Apply swaps to a specific meal
+     * @param mealId The meal ID to modify
      * @param suggestions List of swap suggestions to apply
      * @param userId The user ID
-     * @return Modified meal with applied swaps
+     * @return The modified meal, or null if failed
      */
     public Meal applySwapsToMeal(int mealId, List<SwapSuggestion> suggestions, int userId) {
         try {
@@ -38,6 +63,10 @@ public class SwapService {
             if (originalMeal == null) {
                 throw new IllegalArgumentException("Meal not found: " + mealId);
             }
+            
+            // Store original meal data before modification
+            System.out.println("DEBUG: Storing original meal data for meal " + mealId + " before swap");
+            storeOriginalMealData(originalMeal);
             
             // Create new meal with applied swaps
             Meal modifiedMeal = createModifiedMeal(originalMeal, suggestions);
@@ -149,14 +178,46 @@ public class SwapService {
     }
     
     /**
-     * Store rollback data for a specific date
+     * Store rollback data for a specific date with meal details
      * @param date The date for which to store rollback data
-     * @param rollbackData The rollback data to store
+     * @param originalMeals The original meals before swap
      */
-    public void storeRollbackData(String date, String rollbackData) {
-        // Simple implementation - store in memory for now
-        // In a real implementation, this would be stored in database
-        System.out.println("Storing rollback data for date " + date + ": " + rollbackData);
+    public void storeRollbackData(String date, List<Meal> originalMeals) {
+        try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, cannot store rollback data");
+                return;
+            }
+            
+            System.out.println("DEBUG: Storing rollback data for " + originalMeals.size() + " meals on date " + date);
+            
+            StringBuilder rollbackData = new StringBuilder();
+            rollbackData.append("ORIGINAL_MEALS:");
+            
+            for (Meal meal : originalMeals) {
+                System.out.println("DEBUG: Adding meal " + meal.getType() + " with " + meal.getIngredients().size() + " ingredients");
+                rollbackData.append("\nMEAL:").append(meal.getType().name()).append(":");
+                for (IngredientEntry ingredient : meal.getIngredients()) {
+                    rollbackData.append("\n  FOOD:").append(ingredient.getFoodID())
+                               .append(":").append(ingredient.getQuantity());
+                    System.out.println("DEBUG: Added ingredient FoodID:" + ingredient.getFoodID() + " Quantity:" + ingredient.getQuantity());
+                }
+            }
+            
+            String data = rollbackData.toString();
+            System.out.println("Storing detailed rollback data for date " + date);
+            System.out.println("DEBUG: Complete rollback data: " + data);
+            
+            // Store in database for each meal
+            LocalDate localDate = LocalDate.parse(date);
+            for (Meal meal : originalMeals) {
+                System.out.println("DEBUG: Storing rollback data for meal " + meal.getType() + " (ID: " + meal.getMealID() + ")");
+                swapStatusDAO.markMealAsSwapped(meal.getUserID(), meal.getMealID(), localDate, data);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error storing rollback data: " + e.getMessage());
+        }
     }
     
     /**
@@ -165,9 +226,33 @@ public class SwapService {
      * @return The rollback data, or null if not found
      */
     public String getRollbackData(String date) {
-        // Simple implementation - return null for now
-        // In a real implementation, this would retrieve from database
-        System.out.println("Getting rollback data for date " + date);
+        try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, cannot get rollback data");
+                return null;
+            }
+            
+            LocalDate localDate = LocalDate.parse(date);
+            
+            // Try to find swapped meals for different user IDs (since we don't know the exact user ID)
+            for (int userId = 1; userId <= 10; userId++) { // Try user IDs 1-10
+                List<Integer> swappedMealIds = swapStatusDAO.getSwappedMealIds(userId, localDate);
+                if (!swappedMealIds.isEmpty()) {
+                    System.out.println("Found swapped meals for user " + userId + " on date " + date);
+                    // Get the rollback data from the first swapped meal (all meals have the same complete data)
+                    String rollbackData = swapStatusDAO.getOriginalMealData(userId, swappedMealIds.get(0), localDate);
+                    if (rollbackData != null && !rollbackData.isEmpty()) {
+                        System.out.println("Retrieved rollback data: " + rollbackData.substring(0, Math.min(100, rollbackData.length())) + "...");
+                    }
+                    return rollbackData;
+                }
+            }
+            
+            System.out.println("No swapped meals found for date " + date + " in any user");
+            
+        } catch (Exception e) {
+            System.err.println("Error getting rollback data: " + e.getMessage());
+        }
         return null;
     }
     
@@ -175,18 +260,210 @@ public class SwapService {
      * Restore original meal from rollback data
      * @param mealId The meal ID to restore
      * @param rollbackData The rollback data containing original meal information
+     * @param userId The user ID
      */
-    public void restoreOriginalMeal(int mealId, String rollbackData) {
-        // Simple implementation - just log for now
-        // In a real implementation, this would restore from rollback data
-        System.out.println("Restoring original meal " + mealId + " with data: " + rollbackData);
+    public void restoreOriginalMeal(int mealId, String rollbackData, int userId) {
+        try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, cannot restore meal");
+                return;
+            }
+            
+            // Parse rollback data to get original meal information
+            if (rollbackData != null && rollbackData.startsWith("ORIGINAL_MEALS:")) {
+                // Parse the detailed rollback data
+                String[] lines = rollbackData.split("\n");
+                
+                // Find the meal type for this specific meal ID
+                // We need to get the original date first
+                LocalDate originalDate = null;
+                try {
+                    // Get the original date from the meal
+                    Meal currentMeal = getMealById(mealId, userId);
+                    if (currentMeal != null) {
+                        originalDate = currentMeal.getDate();
+                    } else {
+                        System.err.println("Could not find meal with ID: " + mealId);
+                        return;
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error getting original date: " + e.getMessage());
+                    return;
+                }
+                
+                // Parse rollback data to find the correct meal based on meal type
+                String targetMealType = null;
+                List<IngredientEntry> originalIngredients = new ArrayList<>();
+                
+                // First, get the current meal type to know which meal to restore
+                Meal currentMeal = getMealById(mealId, userId);
+                if (currentMeal != null) {
+                    targetMealType = currentMeal.getType().name();
+                    System.out.println("Looking for meal type: " + targetMealType + " for meal ID: " + mealId);
+                } else {
+                    System.err.println("Could not determine meal type for meal ID: " + mealId);
+                    return;
+                }
+                
+                // Parse rollback data to find the matching meal type
+                boolean foundTargetMeal = false;
+                String currentMealType = "";
+                List<IngredientEntry> currentIngredients = new ArrayList<>();
+                
+                for (String line : lines) {
+                    if (line.startsWith("MEAL:")) {
+                        // If we found a new meal and we were processing the target meal, break
+                        if (foundTargetMeal && currentMealType.equals(targetMealType)) {
+                            break;
+                        }
+                        
+                        // Remove "MEAL:" prefix and any trailing colon
+                        String mealTypeStr = line.substring(5);
+                        if (mealTypeStr.endsWith(":")) {
+                            mealTypeStr = mealTypeStr.substring(0, mealTypeStr.length() - 1);
+                        }
+                        currentMealType = mealTypeStr;
+                        currentIngredients.clear(); // Clear previous meal's ingredients
+                        System.out.println("Parsed meal type: " + currentMealType);
+                        
+                        // Check if this is the meal we're looking for
+                        if (currentMealType.equals(targetMealType)) {
+                            foundTargetMeal = true;
+                        }
+                    } else if (line.startsWith("  FOOD:") && foundTargetMeal && currentMealType.equals(targetMealType)) {
+                        String[] parts = line.substring(7).split(":"); // Remove "  FOOD:" prefix
+                        if (parts.length >= 2) {
+                            int foodId = Integer.parseInt(parts[0]);
+                            double quantity = Double.parseDouble(parts[1]);
+                            currentIngredients.add(new IngredientEntry(foodId, quantity));
+                        }
+                    }
+                }
+                
+                // Use the ingredients we found for the target meal
+                if (foundTargetMeal && !currentIngredients.isEmpty()) {
+                    originalIngredients = new ArrayList<>(currentIngredients);
+                    System.out.println("Found target meal: " + targetMealType + " with " + originalIngredients.size() + " ingredients");
+                } else {
+                    System.err.println("Could not find target meal type: " + targetMealType + " in rollback data");
+                    return;
+                }
+                
+                // Create original meal with parsed data and original date
+                Meal originalMeal = new Meal(mealId, userId, originalDate, 
+                    MealType.valueOf(targetMealType), originalIngredients);
+                
+                System.out.println("Restoring meal " + mealId + " to original state:");
+                System.out.println("  Date: " + originalDate);
+                System.out.println("  Type: " + targetMealType);
+                System.out.println("  Ingredients: " + originalIngredients.size());
+                
+                // Update the meal in database
+                mealDAO.updateMeal(originalMeal);
+                
+                // Mark meal as restored in swap status table
+                swapStatusDAO.markMealAsRestored(userId, mealId, originalDate);
+                
+                System.out.println("Successfully restored original meal " + mealId + " with " + originalIngredients.size() + " ingredients");
+            } else {
+                System.err.println("Invalid rollback data format");
+            }
+        } catch (Exception e) {
+            System.err.println("Error restoring original meal: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Check if meals for a specific date have been swapped
+     * @param userId User ID
+     * @param date Date to check
+     * @return true if any meals for this date have been swapped
+     */
+    public boolean hasMealsBeenSwapped(int userId, LocalDate date) {
+        System.out.println("=== hasMealsBeenSwapped called ===");
+        System.out.println("userId: " + userId + ", date: " + date);
+        System.out.println("swapStatusDAO: " + (swapStatusDAO != null ? "NOT NULL" : "NULL"));
+        
+        try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, returning false");
+                return false;
+            }
+            boolean result = swapStatusDAO.hasMealsBeenSwapped(userId, date);
+            System.out.println("Database query result: " + result);
+            return result;
+        } catch (Exception e) {
+            System.err.println("Error checking if meals have been swapped: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Check if a specific meal has been swapped
+     * @param mealId Meal ID to check
+     * @param userId User ID
+     * @return true if the meal has been swapped
+     */
+    public boolean hasMealBeenSwapped(int mealId, int userId) {
+        try {
+            Meal meal = getMealById(mealId, userId);
+            if (meal == null) {
+                return false;
+            }
+            
+            // Check if rollback data exists for this meal's date
+            return hasMealsBeenSwapped(userId, meal.getDate());
+        } catch (Exception e) {
+            System.err.println("Error checking meal swap status: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Mark a meal as restored (not swapped)
+     * @param mealId The meal ID to mark as restored
+     * @param userId The user ID
+     */
+    public void markMealAsRestored(int mealId, int userId) {
+        try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, cannot mark meal as restored");
+                return;
+            }
+            
+            // Get the meal to find its date
+            Meal meal = getMealById(mealId, userId);
+            if (meal != null) {
+                swapStatusDAO.markMealAsRestored(userId, mealId, meal.getDate());
+                System.out.println("DEBUG: Marked meal " + mealId + " as restored");
+            } else {
+                System.err.println("Could not find meal with ID: " + mealId);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error marking meal as restored: " + e.getMessage());
+        }
     }
     
     // Helper methods
     private Meal getMealById(int mealId, int userId) {
-        // Mock implementation - in real app, use DAO
-        return new Meal(mealId, userId, LocalDate.now(), MealType.LUNCH, 
-                       Arrays.asList(new IngredientEntry(1, 100)));
+        try {
+            // Get all meals for the user and find the one with matching mealId
+            List<Meal> userMeals = mealDAO.getMealsByUserId(userId);
+            if (userMeals != null) {
+                for (Meal meal : userMeals) {
+                    if (meal.getMealID() == mealId) {
+                        return meal;
+                    }
+                }
+            }
+            System.err.println("Meal not found: " + mealId + " for user: " + userId);
+            return null;
+        } catch (Exception e) {
+            System.err.println("Error getting meal by ID: " + e.getMessage());
+            return null;
+        }
     }
     
     private List<Meal> getMealsInDateRange(int userId, LocalDate startDate, LocalDate endDate) {
@@ -284,6 +561,59 @@ public class SwapService {
         foodDatabase.put(2, new FoodItem(2, "Brown Rice", 111, brownRiceNutrients, "Grains"));
         foodDatabase.put(3, new FoodItem(3, "Regular Yogurt", 59, regularYogurtNutrients, "Dairy"));
         foodDatabase.put(4, new FoodItem(4, "Greek Yogurt", 59, greekYogurtNutrients, "Dairy"));
+    }
+    
+    /**
+     * Store original meal data for potential restoration
+     * @param originalMeal The original meal to store
+     */
+    private void storeOriginalMealData(Meal originalMeal) {
+        try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, cannot store original meal data");
+                return;
+            }
+            
+            // Create a simple format: FOOD_ID,QUANTITY;FOOD_ID,QUANTITY
+            StringBuilder mealData = new StringBuilder();
+            mealData.append("ORIGINAL:");
+            
+            for (IngredientEntry ingredient : originalMeal.getIngredients()) {
+                mealData.append(ingredient.getFoodID()).append(",").append(ingredient.getQuantity()).append(";");
+            }
+            
+            String data = mealData.toString();
+            System.out.println("DEBUG: Storing original meal data: " + data);
+            
+            // Store in database
+            swapStatusDAO.markMealAsSwapped(originalMeal.getUserID(), originalMeal.getMealID(), originalMeal.getDate(), data);
+            
+        } catch (Exception e) {
+            System.err.println("Error storing original meal data: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Get original meal data for a specific meal
+     * @param mealId The meal ID
+     * @param userId The user ID
+     * @param date The date
+     * @return The original meal data, or null if not found
+     */
+    public String getOriginalMealData(int mealId, int userId, LocalDate date) {
+        try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, cannot get original meal data");
+                return null;
+            }
+            
+            return swapStatusDAO.getOriginalMealData(userId, mealId, date);
+            
+        } catch (Exception e) {
+            System.err.println("Error getting original meal data: " + e.getMessage());
+        }
+        return null;
     }
     
     // Inner classes for data structures

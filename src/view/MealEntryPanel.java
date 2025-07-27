@@ -31,23 +31,10 @@ public class MealEntryPanel extends JPanel {
 
     private JButton addIngredientBtn, removeIngredientBtn, submitMealBtn;
     
-    // Store yesterday's swap suggestions - store recommended alternative food IDs by meal type
-    private static Map<MealType, Integer> yesterdaySwapSuggestions = new HashMap<>();
-    
     // Calorie statistics labels
     private JLabel totalCaloriesLabel;
     private JLabel remainingLabel;
     private static final double TARGET_CALORIES = 2000.0;
-    
-    // Get yesterday's swap suggestions
-    public static Map<MealType, Integer> getYesterdaySwapSuggestions() {
-        return yesterdaySwapSuggestions;
-    }
-    
-    // Set yesterday's swap suggestions
-    public static void setYesterdaySwapSuggestions(Map<MealType, Integer> suggestions) {
-        yesterdaySwapSuggestions = suggestions;
-    }
     
     // Calculate food calories
     private double calculateFoodCalories(int foodId, double quantity) {
@@ -385,14 +372,7 @@ public class MealEntryPanel extends JPanel {
                 int day = Integer.parseInt((String) dayCombo.getSelectedItem());
                 LocalDate newDate = LocalDate.of(year, month, day);
                 
-                // Check if the selected date is in the future
-                LocalDate today = LocalDate.now();
-                if (newDate.isAfter(today)) {
-                    JOptionPane.showMessageDialog(dateDialog, 
-                        "Cannot select a future date. Please select today or a past date.", 
-                        "Invalid Date", JOptionPane.WARNING_MESSAGE);
-                    return;
-                }
+                // Allow any date selection (removed future date restriction)
                 
                 selectedDate = newDate;
                 dateLabel.setText(selectedDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
@@ -474,8 +454,13 @@ public class MealEntryPanel extends JPanel {
         
         // ===== Add components to dialog =====
         dialog.add(topPanel, BorderLayout.NORTH);
-        dialog.add(searchPanel, BorderLayout.CENTER);
-        dialog.add(scrollPane, BorderLayout.CENTER);
+        
+        // Create center panel to hold both search and scroll pane
+        JPanel centerPanel = new JPanel(new BorderLayout(5, 5));
+        centerPanel.add(searchPanel, BorderLayout.NORTH);
+        centerPanel.add(scrollPane, BorderLayout.CENTER);
+        dialog.add(centerPanel, BorderLayout.CENTER);
+        
         dialog.add(bottomPanel, BorderLayout.SOUTH);
         dialog.getRootPane().setDefaultButton(confirmButton);
         
@@ -560,24 +545,11 @@ public class MealEntryPanel extends JPanel {
     
     private void performSearch(String searchText, String[] foodNames, DefaultListModel<String> listModel, JComboBox<String> mealTypeCombo) {
         String query = searchText.toLowerCase().trim();
-        listModel.clear();
-        
-        System.out.println("Searching for: '" + query + "' in " + foodNames.length + " food items");
-        
-        // Get currently selected meal type
-        String selectedMealType = (String) mealTypeCombo.getSelectedItem();
-        MealType mealType = MealType.valueOf(selectedMealType.toUpperCase());
-        
-        // Check if there's a recommended food
-        Integer recommendedFoodId = yesterdaySwapSuggestions.get(mealType);
-        String recommendedFoodName = null;
-        if (recommendedFoodId != null) {
-            recommendedFoodName = findFoodNameById(recommendedFoodId);
-        }
+        MealType mealType = MealType.valueOf((String) mealTypeCombo.getSelectedItem());
         
         if (query.isEmpty()) {
-            // If search box is empty, show recommended foods and initial list
-            showRecommendedFoods(mealType, foodNames, listModel);
+            // If search box is empty, show initial list
+            showInitialItems(foodNames, listModel);
             return;
         }
         
@@ -589,14 +561,7 @@ public class MealEntryPanel extends JPanel {
             }
         }
         
-        // If there's a recommended food and it matches search criteria, put it at the top
-        if (recommendedFoodName != null && recommendedFoodName.toLowerCase().contains(query)) {
-            listModel.addElement("[RECOMMENDED] " + recommendedFoodName + " (Recommended for " + mealType + ")");
-            listModel.addElement("─────────────────────────────────────────");
-            matchingFoods.remove(recommendedFoodName); // Remove from regular list to avoid duplication
-        }
-        
-        // Add other matching foods
+        // Add matching foods
         int count = 0;
         for (String item : matchingFoods) {
             if (count < 50) { // Limit display count
@@ -605,7 +570,7 @@ public class MealEntryPanel extends JPanel {
             }
         }
         
-        System.out.println("Total matches found: " + (count + (recommendedFoodName != null && recommendedFoodName.toLowerCase().contains(query) ? 1 : 0)));
+        System.out.println("Total matches found: " + count);
         
         if (listModel.size() == 0) {
             listModel.addElement("No items found matching: " + searchText);
@@ -623,6 +588,18 @@ public class MealEntryPanel extends JPanel {
     // OPTIONAL: for integration
     public Date getSelectedDate() {
         return java.sql.Date.valueOf(selectedDate);
+    }
+    
+    public void setSelectedDate(LocalDate date) {
+        this.selectedDate = date;
+        updateDateDisplay();
+        loadTodaysMeals(); // Reload meals for the new date
+    }
+    
+    private void updateDateDisplay() {
+        if (dateLabel != null) {
+            dateLabel.setText("Date: " + selectedDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        }
     }
 
     public String getMealType() {
@@ -730,26 +707,8 @@ public class MealEntryPanel extends JPanel {
     private void showRecommendedFoods(MealType mealType, String[] foodNames, DefaultListModel<String> listModel) {
         listModel.clear();
         
-        // Check if there are yesterday's swap suggestions
-        Integer recommendedFoodId = yesterdaySwapSuggestions.get(mealType);
-        if (recommendedFoodId != null) {
-            // Find the suggested food name
-            String recommendedFoodName = findFoodNameById(recommendedFoodId);
-            if (recommendedFoodName != null) {
-                // Add recommended food to the top of the list
-                listModel.addElement("[RECOMMENDED] " + recommendedFoodName + " (Recommended for " + mealType + ")");
-                
-                // Add separator line
-                listModel.addElement("─────────────────────────────────────────");
-            }
-        }
-        
-        // Add all other foods
+        // Add all foods without any recommendations
         for (String foodName : foodNames) {
-            // Skip already added recommended food
-            if (recommendedFoodId != null && foodName.equals(findFoodNameById(recommendedFoodId))) {
-                continue;
-            }
             listModel.addElement(foodName);
         }
     }

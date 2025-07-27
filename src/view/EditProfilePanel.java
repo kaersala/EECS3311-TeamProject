@@ -239,15 +239,27 @@ public class EditProfilePanel extends JPanel {
 
     private void deleteProfile(ActionEvent e) {
         // First confirmation
-        int confirm = JOptionPane.showConfirmDialog(this, 
-            "Are you sure you want to delete your profile?\n\nThis action cannot be undone.", 
-            "Confirm Deletion", JOptionPane.YES_NO_OPTION);
+        int confirm = JOptionPane.showOptionDialog(this,
+            "Are you sure you want to save changes to your profile?",
+            "Confirm Save",
+            JOptionPane.YES_NO_OPTION,
+            JOptionPane.QUESTION_MESSAGE,
+            null,
+            new String[]{"Yes", "No"},
+            "Yes"
+        );
         
         if (confirm == JOptionPane.YES_OPTION) {
             // Second confirmation
-            int finalConfirm = JOptionPane.showConfirmDialog(this, 
-                "This will permanently delete your profile and all associated data.\n\nAre you absolutely sure?", 
-                "Final Confirmation", JOptionPane.YES_NO_OPTION);
+            int finalConfirm = JOptionPane.showOptionDialog(this,
+                "Are you sure you want to delete your profile? This action cannot be undone.",
+                "Confirm Delete",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                new String[]{"Yes", "No"},
+                "Yes"
+            );
             
             if (finalConfirm == JOptionPane.YES_OPTION) {
                 if (profileController != null) {

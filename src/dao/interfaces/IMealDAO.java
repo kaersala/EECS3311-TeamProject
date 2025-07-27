@@ -8,4 +8,6 @@ public interface IMealDAO {
     Meal getMealById(int mealId);
     void saveMeal(Meal meal);
     void updateMeal(Meal meal);
+    void deleteMeal(int mealId);
+    void deleteMealsByDate(int userId, String date);
 }

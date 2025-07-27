@@ -14,6 +14,7 @@ public interface DatabaseAdapter {
     void saveMeal(Meal meal);
     void updateMeal(Meal meal);
     void deleteMeal(int mealId);
+    void deleteMealsByDate(int userId, String date);
     List<Meal> loadMeals(int userId);
     void updateIngredientQuantity(int mealId, int foodId, double newQuantity);
 

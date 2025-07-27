@@ -30,22 +30,28 @@ public class GoalDAO implements IGoalDAO {
         // First delete existing goals for this user
         deleteGoals(userId);
         
-        // Then insert new goals using the existing table structure
-        String insertQuery = "INSERT INTO user_goals (UserID, Goal, ActivityLevel) VALUES (?, ?, ?)";
+        // Then insert new goals
+        String insertQuery = "INSERT INTO user_goals (UserID, Nutrient, Direction, Amount, Intensity, CreatedAt) VALUES (?, ?, ?, ?, ?, NOW())";
         
         try {
-            Connection conn = databaseAdapter.getConnection();
+            Connection conn = databaseAdapter.connect();
             if (conn != null) {
                 try (PreparedStatement stmt = conn.prepareStatement(insertQuery)) {
                     for (Goal goal : goals) {
                         stmt.setInt(1, userId);
-                        // Combine direction and nutrient into Goal column
-                        String goalText = goal.getDirection() + " " + goal.getNutrient();
-                        stmt.setString(2, goalText);
-                        stmt.setString(3, goal.getIntensity());
-                        stmt.executeUpdate();
+                        stmt.setString(2, goal.getNutrient());
+                        stmt.setString(3, goal.getDirection());
+                        stmt.setDouble(4, goal.getAmount());
+                        stmt.setString(5, goal.getIntensity());
+                        stmt.addBatch();
                     }
-                    System.out.println("Goals saved successfully for user " + userId);
+                    stmt.executeBatch();
+                    System.out.println("Saved " + goals.size() + " goals for user " + userId);
+                } finally {
+                    // Always close the connection
+                    if (conn != null && !conn.isClosed()) {
+                        conn.close();
+                    }
                 }
             } else {
                 throw new SQLException("Database connection is null");
@@ -59,38 +65,31 @@ public class GoalDAO implements IGoalDAO {
     
     @Override
     public List<Goal> loadGoals(int userId) {
-        // Use the existing table structure: GoalID, UserID, ActivityLevel, Goal, CreatedAt
-        String selectQuery = "SELECT Goal, ActivityLevel FROM user_goals WHERE UserID = ?";
         List<Goal> goals = new ArrayList<>();
+        String query = "SELECT Nutrient, Direction, Amount, Intensity FROM user_goals WHERE UserID = ?";
         
         try {
-            Connection conn = databaseAdapter.getConnection();
+            Connection conn = databaseAdapter.connect();
             if (conn != null) {
-                try (PreparedStatement stmt = conn.prepareStatement(selectQuery)) {
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
                     stmt.setInt(1, userId);
                     ResultSet rs = stmt.executeQuery();
                     
                     while (rs.next()) {
-                        String goalText = rs.getString("Goal");
-                        String activityLevel = rs.getString("ActivityLevel");
+                        String nutrient = rs.getString("Nutrient");
+                        String direction = rs.getString("Direction");
+                        double amount = rs.getDouble("Amount");
+                        String intensity = rs.getString("Intensity");
                         
-                        // Parse the goal text to extract nutrient and direction
-                        // Assuming goal text format like "Increase Fiber" or "Decrease Calories"
-                        if (goalText != null && !goalText.trim().isEmpty()) {
-                            String[] parts = goalText.split("\\s+", 2);
-                            if (parts.length >= 2) {
-                                String direction = parts[0]; // "Increase" or "Decrease"
-                                String nutrient = parts[1]; // "Fiber", "Calories", etc.
-                                
-                                // Set default values for missing fields
-                                // Calculate amount based on nutrient and intensity
-                                double amount = calculateDefaultAmount(nutrient, activityLevel);
-                                String intensity = activityLevel != null ? activityLevel.toLowerCase() : "moderate";
-                                
-                                Goal goal = new Goal(nutrient, direction, amount, intensity);
-                                goals.add(goal);
-                            }
+                        if (nutrient != null && direction != null) {
+                            Goal goal = new Goal(nutrient, direction, amount, intensity);
+                            goals.add(goal);
                         }
+                    }
+                } finally {
+                    // Always close the connection
+                    if (conn != null && !conn.isClosed()) {
+                        conn.close();
                     }
                 }
             } else {
@@ -115,12 +114,17 @@ public class GoalDAO implements IGoalDAO {
         String deleteQuery = "DELETE FROM user_goals WHERE UserID = ?";
         
         try {
-            Connection conn = databaseAdapter.getConnection();
+            Connection conn = databaseAdapter.connect();
             if (conn != null) {
                 try (PreparedStatement stmt = conn.prepareStatement(deleteQuery)) {
                     stmt.setInt(1, userId);
                     int rowsAffected = stmt.executeUpdate();
                     System.out.println("Deleted " + rowsAffected + " goals for user " + userId);
+                } finally {
+                    // Always close the connection
+                    if (conn != null && !conn.isClosed()) {
+                        conn.close();
+                    }
                 }
             } else {
                 throw new SQLException("Database connection is null");
@@ -137,7 +141,7 @@ public class GoalDAO implements IGoalDAO {
         String countQuery = "SELECT COUNT(*) FROM user_goals WHERE UserID = ?";
         
         try {
-            Connection conn = databaseAdapter.getConnection();
+            Connection conn = databaseAdapter.connect();
             if (conn != null) {
                 try (PreparedStatement stmt = conn.prepareStatement(countQuery)) {
                     stmt.setInt(1, userId);
@@ -145,6 +149,11 @@ public class GoalDAO implements IGoalDAO {
                     
                     if (rs.next()) {
                         return rs.getInt(1) > 0;
+                    }
+                } finally {
+                    // Always close the connection
+                    if (conn != null && !conn.isClosed()) {
+                        conn.close();
                     }
                 }
             } else {

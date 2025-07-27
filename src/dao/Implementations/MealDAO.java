@@ -26,7 +26,20 @@ public class MealDAO implements IMealDAO {
     @Override
     public Meal getMealById(int mealId) {
         List<Meal> allMeals = new ArrayList<>();
-        // For now, this is a placeholder that returns null
+        
+        // Try to find the meal by searching through all users
+        for (int userId = 1; userId <= 10; userId++) {
+            List<Meal> userMeals = getMealsByUserId(userId);
+            if (userMeals != null) {
+                for (Meal meal : userMeals) {
+                    if (meal.getMealID() == mealId) {
+                        return meal;
+                    }
+                }
+            }
+        }
+        
+        System.err.println("Meal with ID " + mealId + " not found");
         return null;
     }
 
@@ -38,5 +51,15 @@ public class MealDAO implements IMealDAO {
     @Override
     public void updateMeal(Meal meal) {
         adapter.updateMeal(meal);
+    }
+    
+    @Override
+    public void deleteMeal(int mealId) {
+        adapter.deleteMeal(mealId);
+    }
+    
+    @Override
+    public void deleteMealsByDate(int userId, String date) {
+        adapter.deleteMealsByDate(userId, date);
     }
 }

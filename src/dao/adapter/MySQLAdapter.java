@@ -54,24 +54,41 @@ public class MySQLAdapter implements DatabaseAdapter {
     public void saveMeal(Meal meal) {
         String mealInsert = "INSERT INTO meal (UserID, Date, Type) VALUES (?, ?, ?)";
         String ingredientInsert = "INSERT INTO ingredient (MealID, FoodID, Quantity) VALUES (?, ?, ?)";
-        try (
-                PreparedStatement mealStmt = connection.prepareStatement(mealInsert, Statement.RETURN_GENERATED_KEYS);
-                PreparedStatement ingredientStmt = connection.prepareStatement(ingredientInsert)
-        ) {
-            mealStmt.setInt(1, meal.getUserID());
-            mealStmt.setDate(2, java.sql.Date.valueOf(meal.getDate()));
-            mealStmt.setString(3, meal.getType().name());
-            mealStmt.executeUpdate();
-            try (ResultSet generatedKeys = mealStmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    int mealId = generatedKeys.getInt(1);
-                    for (IngredientEntry entry : meal.getIngredients()) {
-                        ingredientStmt.setInt(1, mealId);
-                        ingredientStmt.setInt(2, entry.getFoodID());
-                        ingredientStmt.setDouble(3, entry.getQuantity());
-                        ingredientStmt.addBatch();
+        
+        try {
+            // Create a new connection for this operation
+            Connection conn = connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for saving meal");
+                return;
+            }
+            
+            try (
+                    PreparedStatement mealStmt = conn.prepareStatement(mealInsert, Statement.RETURN_GENERATED_KEYS);
+                    PreparedStatement ingredientStmt = conn.prepareStatement(ingredientInsert)
+            ) {
+                mealStmt.setInt(1, meal.getUserID());
+                mealStmt.setDate(2, java.sql.Date.valueOf(meal.getDate()));
+                mealStmt.setString(3, meal.getType().name());
+                mealStmt.executeUpdate();
+                try (ResultSet generatedKeys = mealStmt.getGeneratedKeys()) {
+                    if (generatedKeys.next()) {
+                        int mealId = generatedKeys.getInt(1);
+                        for (IngredientEntry entry : meal.getIngredients()) {
+                            ingredientStmt.setInt(1, mealId);
+                            ingredientStmt.setInt(2, entry.getFoodID());
+                            ingredientStmt.setDouble(3, entry.getQuantity());
+                            ingredientStmt.addBatch();
+                        }
+                        ingredientStmt.executeBatch();
+                        System.out.println("Saved meal: " + meal.getIngredients().get(0).getFoodID() + 
+                                         " (" + meal.getIngredients().get(0).getQuantity() + "g, " + meal.getType() + ")");
                     }
-                    ingredientStmt.executeBatch();
+                }
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
                 }
             }
         } catch (SQLException e) {
@@ -84,21 +101,87 @@ public class MySQLAdapter implements DatabaseAdapter {
         String deleteIngredients = "DELETE FROM ingredient WHERE MealID = ?";
         String deleteMeal = "DELETE FROM meal WHERE MealID = ?";
         
-        try (
-                PreparedStatement ingredientStmt = connection.prepareStatement(deleteIngredients);
-                PreparedStatement mealStmt = connection.prepareStatement(deleteMeal)
-        ) {
-            // First delete ingredients (due to foreign key constraint)
-            ingredientStmt.setInt(1, mealId);
-            ingredientStmt.executeUpdate();
+        try {
+            // Create a new connection for this operation
+            Connection conn = connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for deleting meal");
+                return;
+            }
             
-            // Then delete the meal
-            mealStmt.setInt(1, mealId);
-            mealStmt.executeUpdate();
-            
-            System.out.println("Deleted meal ID: " + mealId);
+            try (
+                    PreparedStatement ingredientStmt = conn.prepareStatement(deleteIngredients);
+                    PreparedStatement mealStmt = conn.prepareStatement(deleteMeal)
+            ) {
+                // First delete ingredients (due to foreign key constraint)
+                ingredientStmt.setInt(1, mealId);
+                ingredientStmt.executeUpdate();
+                
+                // Then delete the meal
+                mealStmt.setInt(1, mealId);
+                mealStmt.executeUpdate();
+                
+                System.out.println("Deleted meal ID: " + mealId);
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
+            }
         } catch (SQLException e) {
             System.err.println("Error deleting meal: " + e.getMessage());
+        }
+    }
+    
+    @Override
+    public void deleteMealsByDate(int userId, String date) {
+        // First get all meal IDs for the given date and user
+        String getMealIds = "SELECT MealID FROM meal WHERE UserID = ? AND Date = ?";
+        String deleteIngredients = "DELETE FROM ingredient WHERE MealID = ?";
+        String deleteMeal = "DELETE FROM meal WHERE MealID = ?";
+        
+        try {
+            // Create a new connection for this operation
+            Connection conn = connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for deleting meals by date");
+                return;
+            }
+            
+            try (
+                    PreparedStatement getMealIdsStmt = conn.prepareStatement(getMealIds);
+                    PreparedStatement ingredientStmt = conn.prepareStatement(deleteIngredients);
+                    PreparedStatement mealStmt = conn.prepareStatement(deleteMeal)
+            ) {
+                getMealIdsStmt.setInt(1, userId);
+                getMealIdsStmt.setDate(2, java.sql.Date.valueOf(date));
+                ResultSet rs = getMealIdsStmt.executeQuery();
+                
+                List<Integer> mealIds = new ArrayList<>();
+                while (rs.next()) {
+                    mealIds.add(rs.getInt("MealID"));
+                }
+                
+                // Delete ingredients and meals for each meal ID
+                for (Integer mealId : mealIds) {
+                    // First delete ingredients (due to foreign key constraint)
+                    ingredientStmt.setInt(1, mealId);
+                    ingredientStmt.executeUpdate();
+                    
+                    // Then delete the meal
+                    mealStmt.setInt(1, mealId);
+                    mealStmt.executeUpdate();
+                }
+                
+                System.out.println("Deleted " + mealIds.size() + " meals for user " + userId + " on date " + date);
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error deleting meals by date: " + e.getMessage());
         }
     }
 
@@ -106,16 +189,30 @@ public class MySQLAdapter implements DatabaseAdapter {
     public void updateIngredientQuantity(int mealId, int foodId, double newQuantity) {
         String updateQuery = "UPDATE ingredient SET Quantity = ? WHERE MealID = ? AND FoodID = ?";
         
-        try (PreparedStatement stmt = connection.prepareStatement(updateQuery)) {
-            stmt.setDouble(1, newQuantity);
-            stmt.setInt(2, mealId);
-            stmt.setInt(3, foodId);
+        try {
+            // Create a new connection for this operation
+            Connection conn = connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for updating ingredient quantity");
+                return;
+            }
             
-            int rowsAffected = stmt.executeUpdate();
-            if (rowsAffected > 0) {
-                System.out.println("Successfully updated quantity for meal " + mealId + ", food " + foodId + " to " + newQuantity);
-            } else {
-                System.err.println("No rows updated for meal " + mealId + ", food " + foodId);
+            try (PreparedStatement stmt = conn.prepareStatement(updateQuery)) {
+                stmt.setDouble(1, newQuantity);
+                stmt.setInt(2, mealId);
+                stmt.setInt(3, foodId);
+                
+                int rowsAffected = stmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Successfully updated quantity for meal " + mealId + ", food " + foodId + " to " + newQuantity);
+                } else {
+                    System.err.println("No rows updated for meal " + mealId + ", food " + foodId);
+                }
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
             }
         } catch (SQLException e) {
             System.err.println("Error updating ingredient quantity: " + e.getMessage());
@@ -128,31 +225,45 @@ public class MySQLAdapter implements DatabaseAdapter {
         String deleteIngredients = "DELETE FROM ingredient WHERE MealID = ?";
         String ingredientInsert = "INSERT INTO ingredient (MealID, FoodID, Quantity) VALUES (?, ?, ?)";
         
-        try (
-                PreparedStatement mealStmt = connection.prepareStatement(mealUpdate);
-                PreparedStatement deleteStmt = connection.prepareStatement(deleteIngredients);
-                PreparedStatement ingredientStmt = connection.prepareStatement(ingredientInsert)
-        ) {
-            // Update meal details
-            mealStmt.setInt(1, meal.getUserID());
-            mealStmt.setDate(2, java.sql.Date.valueOf(meal.getDate()));
-            mealStmt.setString(3, meal.getType().name());
-            mealStmt.setInt(4, meal.getMealID());
-            mealStmt.executeUpdate();
-            
-            // Delete existing ingredients
-            deleteStmt.setInt(1, meal.getMealID());
-            deleteStmt.executeUpdate();
-            
-            // Insert new ingredients
-            for (IngredientEntry entry : meal.getIngredients()) {
-                ingredientStmt.setInt(1, meal.getMealID());
-                ingredientStmt.setInt(2, entry.getFoodID());
-                ingredientStmt.setDouble(3, entry.getQuantity());
-                ingredientStmt.addBatch();
+        try {
+            // Create a new connection for this operation
+            Connection conn = connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for updating meal");
+                return;
             }
-            ingredientStmt.executeBatch();
             
+            try (
+                    PreparedStatement mealStmt = conn.prepareStatement(mealUpdate);
+                    PreparedStatement deleteStmt = conn.prepareStatement(deleteIngredients);
+                    PreparedStatement ingredientStmt = conn.prepareStatement(ingredientInsert)
+            ) {
+                // Update meal details
+                mealStmt.setInt(1, meal.getUserID());
+                mealStmt.setDate(2, java.sql.Date.valueOf(meal.getDate()));
+                mealStmt.setString(3, meal.getType().name());
+                mealStmt.setInt(4, meal.getMealID());
+                mealStmt.executeUpdate();
+                
+                // Delete existing ingredients
+                deleteStmt.setInt(1, meal.getMealID());
+                deleteStmt.executeUpdate();
+                
+                // Insert new ingredients
+                for (IngredientEntry entry : meal.getIngredients()) {
+                    ingredientStmt.setInt(1, meal.getMealID());
+                    ingredientStmt.setInt(2, entry.getFoodID());
+                    ingredientStmt.setDouble(3, entry.getQuantity());
+                    ingredientStmt.addBatch();
+                }
+                ingredientStmt.executeBatch();
+                
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
+            }
         } catch (SQLException e) {
             System.err.println("Error updating meal: " + e.getMessage());
         }
@@ -163,40 +274,55 @@ public class MySQLAdapter implements DatabaseAdapter {
         List<Meal> meals = new ArrayList<>();
         String mealQuery = "SELECT * FROM meal WHERE UserID = ? ORDER BY Date DESC";
         String ingredientQuery = "SELECT FoodID, Quantity FROM ingredient WHERE MealID = ?";
-        try (
-                PreparedStatement mealStmt = connection.prepareStatement(mealQuery);
-                PreparedStatement ingredientStmt = connection.prepareStatement(ingredientQuery)
-        ) {
-            mealStmt.setInt(1, userId);
-            ResultSet mealRs = mealStmt.executeQuery();
-            while (mealRs.next()) {
-                int mealId = mealRs.getInt("MealID");
-                java.time.LocalDate date = mealRs.getDate("Date").toLocalDate();
-                MealType type = MealType.valueOf(mealRs.getString("Type"));
-                List<IngredientEntry> ingredients = new ArrayList<>();
-                ingredientStmt.setInt(1, mealId);
-                ResultSet ingRs = ingredientStmt.executeQuery();
-                while (ingRs.next()) {
-                    int foodId = ingRs.getInt("FoodID");
-                    double quantity = ingRs.getDouble("Quantity");
-                    
-                    // Check if this food ID exists in the database
-                    String foodCheckQuery = "SELECT COUNT(*) FROM food_name WHERE FoodID = ?";
-                    try (PreparedStatement checkStmt = connection.prepareStatement(foodCheckQuery)) {
-                        checkStmt.setInt(1, foodId);
-                        ResultSet checkRs = checkStmt.executeQuery();
-                        if (checkRs.next() && checkRs.getInt(1) == 0) {
-                            System.err.println("Warning: Food item with ID " + foodId + " not found in database, skipping...");
-                            continue; // Skip this ingredient
+        
+        try {
+            // Create a new connection for this operation
+            Connection conn = connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for loading meals");
+                return meals;
+            }
+            
+            try (
+                    PreparedStatement mealStmt = conn.prepareStatement(mealQuery);
+                    PreparedStatement ingredientStmt = conn.prepareStatement(ingredientQuery)
+            ) {
+                mealStmt.setInt(1, userId);
+                ResultSet mealRs = mealStmt.executeQuery();
+                while (mealRs.next()) {
+                    int mealId = mealRs.getInt("MealID");
+                    java.time.LocalDate date = mealRs.getDate("Date").toLocalDate();
+                    MealType type = MealType.valueOf(mealRs.getString("Type"));
+                    List<IngredientEntry> ingredients = new ArrayList<>();
+                    ingredientStmt.setInt(1, mealId);
+                    ResultSet ingRs = ingredientStmt.executeQuery();
+                    while (ingRs.next()) {
+                        int foodId = ingRs.getInt("FoodID");
+                        double quantity = ingRs.getDouble("Quantity");
+                        
+                        // Check if this food ID exists in the database
+                        String foodCheckQuery = "SELECT COUNT(*) FROM food_name WHERE FoodID = ?";
+                        try (PreparedStatement checkStmt = conn.prepareStatement(foodCheckQuery)) {
+                            checkStmt.setInt(1, foodId);
+                            ResultSet checkRs = checkStmt.executeQuery();
+                            if (checkRs.next() && checkRs.getInt(1) == 0) {
+                                System.err.println("Warning: Food item with ID " + foodId + " not found in database, skipping...");
+                                continue; // Skip this ingredient
+                            }
+                        } catch (SQLException e) {
+                            System.err.println("Error checking food ID " + foodId + ": " + e.getMessage());
+                            continue;
                         }
-                    } catch (SQLException e) {
-                        System.err.println("Error checking food ID " + foodId + ": " + e.getMessage());
-                        continue;
+                        
+                        ingredients.add(new IngredientEntry(foodId, quantity));
                     }
-                    
-                    ingredients.add(new IngredientEntry(foodId, quantity));
+                    meals.add(new Meal(mealId, userId, date, type, ingredients));
                 }
-                meals.add(new Meal(mealId, userId, date, type, ingredients));
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
             }
         } catch (SQLException e) {
             System.err.println("Error loading meals: " + e.getMessage());

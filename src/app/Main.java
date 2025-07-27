@@ -28,6 +28,7 @@ public class Main {
     private static IGoalDAO goalDAO;
     private static Map<Integer, FoodItem> foodDatabase;
     private static JFrame mainFrame;
+    private static SwapService swapService;
     
     public static void main(String[] args) {
         // Initialize the application
@@ -51,6 +52,10 @@ public class Main {
             userProfileDAO = new UserProfileDAO();
             goalDAO = new GoalDAO();
             
+            // Set database adapter for SwapService
+            swapService = new SwapService();
+            swapService.setDatabaseAdapter(databaseAdapter);
+            
             System.out.println("Database connection established successfully");
         } else {
             // Fallback to in-memory data if database connection fails
@@ -59,6 +64,10 @@ public class Main {
             foodDAO = new FoodDAO(null);
             userProfileDAO = new UserProfileDAO();
             goalDAO = new GoalDAO();
+            
+            // Initialize SwapService even without database connection
+            swapService = new SwapService();
+            System.err.println("Warning: SwapService initialized without database adapter");
             
             // Load food database
             loadFoodDatabase();
@@ -285,6 +294,28 @@ public class Main {
         journalFrame.setLocationRelativeTo(null);
         
         int userId = currentUser != null ? currentUser.getUserID() : 4; // Use user 4 as default since that's where the meal data is
+        
+        // Debug: Check swapService status
+        System.out.println("=== showJournal() called ===");
+        System.out.println("Global swapService: " + (swapService != null ? "NOT NULL" : "NULL"));
+        
+        // Use the global swapService instance if available, otherwise create a new one
+        SwapService journalSwapService = swapService != null ? swapService : new SwapService();
+        System.out.println("journalSwapService: " + (journalSwapService != null ? "NOT NULL" : "NULL"));
+        
+        // Get the database adapter that was used to initialize swapService
+        DatabaseAdapter journalDatabaseAdapter = null;
+        if (swapService != null) {
+            // Try to get the database adapter from the existing connection
+            try {
+                journalDatabaseAdapter = new MySQLAdapter();
+                journalDatabaseAdapter.connect();
+                System.out.println("Created new DatabaseAdapter for JournalPanel");
+            } catch (Exception e) {
+                System.err.println("Failed to create DatabaseAdapter for JournalPanel: " + e.getMessage());
+            }
+        }
+        
         JournalPanel journalPanel = new JournalPanel(userId);
         
         // Add a back button
@@ -594,6 +625,28 @@ public class Main {
         journalFrame.setLocationRelativeTo(mainFrame);
         // Assume current user ID is 1, actual can be obtained from currentUser.getUserID()
         int userId = currentUser != null ? currentUser.getUserID() : 1;
+        
+        // Debug: Check swapService status
+        System.out.println("=== showJournalPanel() called ===");
+        System.out.println("Global swapService: " + (swapService != null ? "NOT NULL" : "NULL"));
+        
+        // Use the global swapService instance if available, otherwise create a new one
+        SwapService journalSwapService = swapService != null ? swapService : new SwapService();
+        System.out.println("journalSwapService: " + (journalSwapService != null ? "NOT NULL" : "NULL"));
+        
+        // Get the database adapter that was used to initialize swapService
+        DatabaseAdapter journalDatabaseAdapter = null;
+        if (swapService != null) {
+            // Try to get the database adapter from the existing connection
+            try {
+                journalDatabaseAdapter = new MySQLAdapter();
+                journalDatabaseAdapter.connect();
+                System.out.println("Created new DatabaseAdapter for JournalPanel");
+            } catch (Exception e) {
+                System.err.println("Failed to create DatabaseAdapter for JournalPanel: " + e.getMessage());
+            }
+        }
+        
         view.JournalPanel journalPanel = new view.JournalPanel(userId);
         journalFrame.add(journalPanel);
         journalFrame.setVisible(true);
