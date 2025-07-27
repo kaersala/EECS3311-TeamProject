@@ -14,10 +14,21 @@ public class UserProfileController {
 
     public void createProfile(String name, String sex,
                               LocalDate dob, double height, double weight) {
+        // Check if a profile with this name already exists
+        List<UserProfile> existingProfiles = userProfileDAO.getAllUserProfiles();
+        boolean nameExists = existingProfiles.stream()
+                .anyMatch(profile -> profile.getName().equals(name));
+        
+        if (nameExists) {
+            throw new IllegalArgumentException("A profile with the name '" + name + "' already exists. Please choose a different name.");
+        }
+        
         UserProfile newProfile = new UserProfile(name, sex, dob, height, weight);
         newProfile.getSettings().setUnits("metric");
-        manager.addProfile(newProfile);
+        
+        // Save to database first, then add to manager
         userProfileDAO.saveUserProfile(newProfile);
+        manager.addProfile(newProfile);
     }
 
     public void editProfile(String name, String sex,
@@ -54,5 +65,14 @@ public class UserProfileController {
         return (profile != null && profile.getSettings() != null) 
                ? profile.getSettings().getUnits() 
                : "Metric"; // default fallback
+    }
+
+    public void deleteProfile(int userId) {
+        userProfileDAO.deleteUserProfile(userId);
+        // Remove from manager if it's the current profile
+        UserProfile currentProfile = manager.getCurrentProfile();
+        if (currentProfile != null && currentProfile.getUserID() == userId) {
+            manager.removeCurrentProfile();
+        }
     }
 }

@@ -39,10 +39,18 @@ public class NutritionAnalyzer {
 
             double quantityFactor = entry.getQuantity() / 100.0; // nutrients per 100g
 
+            // Add calories from the food item
+            double calories = food.getCalories() * quantityFactor;
+            totalNutrients.merge("Calories", calories, Double::sum);
+
+            // Add other nutrients with proper unit handling
             for (Map.Entry<String, Double> nutrient : food.getNutrients().entrySet()) {
                 String nutrientName = nutrient.getKey();
                 double amount = nutrient.getValue() * quantityFactor;
 
+                // Debug: Show nutrient values being added
+                System.out.println("Adding nutrient: " + nutrientName + " = " + amount + " (from " + nutrient.getValue() + " * " + quantityFactor + ")");
+                
                 totalNutrients.merge(nutrientName, amount, Double::sum);
             }
         }

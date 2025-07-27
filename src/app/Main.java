@@ -8,10 +8,13 @@ import service.*;
 import backend.*;
 import controller.*;
 import dao.Implementations.*;
+import dao.interfaces.IGoalDAO;
+import dao.adapter.*;
 import chart.*;
 
 import javax.swing.*;
 import java.awt.*;
+import java.sql.Connection;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.List;
@@ -22,10 +25,15 @@ public class Main {
     private static MealDAO mealDAO;
     private static FoodDAO foodDAO;
     private static UserProfileDAO userProfileDAO;
+    private static IGoalDAO goalDAO;
     private static Map<Integer, FoodItem> foodDatabase;
     private static JFrame mainFrame;
+    private static SwapService swapService;
     
     public static void main(String[] args) {
+        // Set English locale for the entire application
+        Locale.setDefault(Locale.ENGLISH);
+        
         // Initialize the application
         initializeApplication();
         
@@ -36,18 +44,40 @@ public class Main {
     }
     
     private static void initializeApplication() {
-        // Initialize DAOs with null connection for demo (in real app, would use actual database connection)
-        mealDAO = new MealDAO();
-        foodDAO = new FoodDAO(null); // Will use in-memory data instead
-        userProfileDAO = new UserProfileDAO();
+        // Initialize database adapter
+        DatabaseAdapter databaseAdapter = new MySQLAdapter();
+        Connection connection = databaseAdapter.connect();
         
-        // Load food database
-        loadFoodDatabase();
+        if (connection != null) {
+            // Initialize DAOs with database connection
+            mealDAO = new MealDAO();
+            foodDAO = new FoodDAO(connection);
+            userProfileDAO = new UserProfileDAO();
+            goalDAO = new GoalDAO();
+            
+            // Set database adapter for SwapService
+            swapService = new SwapService();
+            swapService.setDatabaseAdapter(databaseAdapter);
+            
+            System.out.println("Database connection established successfully");
+        } else {
+            // Fallback to in-memory data if database connection fails
+            System.err.println("Warning: Database connection failed, using in-memory data");
+            mealDAO = new MealDAO();
+            foodDAO = new FoodDAO(null);
+            userProfileDAO = new UserProfileDAO();
+            goalDAO = new GoalDAO();
+            
+            // Initialize SwapService even without database connection
+            swapService = new SwapService();
+            System.err.println("Warning: SwapService initialized without database adapter");
+            
+            // Load food database
+            loadFoodDatabase();
+        }
         
         // Initialize services
         initializeServices();
-        
-        System.out.println("NutriSci Application initialized successfully!");
     }
     
     private static void loadFoodDatabase() {
@@ -81,38 +111,43 @@ public class Main {
     }
     
     private static void showSplashScreen() {
-        // Create sample profiles for demo
-        List<String> profiles = Arrays.asList("Alice Smith", "Bob Johnson", "Charlie Lee");
-        
         // Create splash screen with callback to continue to main menu
-        SplashScreenUI splashScreen = new SplashScreenUI(profiles, () -> {
+        SplashScreenUI splashScreen = new SplashScreenUI(() -> {
             // This will be called when a profile is selected
-            // Create a default user and go directly to main menu
-            currentUser = new UserProfile("Demo User", "Male", LocalDate.of(1990, 1, 1), 175.0, 70.0);
-            currentUser.setUserID(1);
-            showMainMenu();
+            // Get the current user from UserProfileManager
+            UserProfileManager profileManager = UserProfileManager.getInstance();
+            currentUser = profileManager.getCurrentProfile();
+            
+            if (currentUser != null) {
+                // Load user's goals
+                loadUserGoals();
+                showMainMenu();
+            } else {
+                // If no current profile, show error and exit
+                JOptionPane.showMessageDialog(null, "No profile selected. Please restart the application.", 
+                    "Error", JOptionPane.ERROR_MESSAGE);
+                System.exit(1);
+            }
         });
         
         splashScreen.setVisible(true);
     }
     
+    private static void loadUserGoals() {
+        if (currentUser != null) {
+            userGoals = goalDAO.loadGoals(currentUser.getUserID());
+            System.out.println("Loaded " + userGoals.size() + " goals for user " + currentUser.getUserID());
+        }
+    }
+    
     private static void showGoalSelection() {
-        // Sample predefined goals
-        List<Goal> goals = new ArrayList<>();
-        goals.add(new Goal("Fiber", "Increase", 2.0, ""));
-        goals.add(new Goal("Calories", "Decrease", 10.0, ""));
-        goals.add(new Goal("Sodium", "Decrease", 1.5, ""));
-        goals.add(new Goal("Protein", "Increase", 5.0, ""));
-        goals.add(new Goal("Fat", "Decrease", 3.0, ""));
-        goals.add(new Goal("Carbohydrates", "Decrease", 5.0, ""));
-
         // Create frame for goal selection
         mainFrame = new JFrame("Select Nutritional Goals");
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         mainFrame.setSize(500, 400);
         mainFrame.setLocationRelativeTo(null);
         
-        GoalSelectionUI goalSelectionUI = new GoalSelectionUI(goals);
+        GoalSelectionUI goalSelectionUI = new GoalSelectionUI();
         
         // Add a continue button to proceed to main menu
         JButton continueBtn = new JButton("Continue to Main Menu");
@@ -135,31 +170,40 @@ public class Main {
     }
     
     private static void showGoalSelectionFromMenu() {
-        // Sample predefined goals
-        List<Goal> goals = new ArrayList<>();
-        goals.add(new Goal("Fiber", "Increase", 2.0, ""));
-        goals.add(new Goal("Calories", "Decrease", 10.0, ""));
-        goals.add(new Goal("Sodium", "Decrease", 1.5, ""));
-        goals.add(new Goal("Protein", "Increase", 5.0, ""));
-        goals.add(new Goal("Fat", "Decrease", 3.0, ""));
-        goals.add(new Goal("Carbohydrates", "Decrease", 5.0, ""));
-
         // Create a new frame for goal selection (not replacing main frame)
         JFrame goalFrame = new JFrame("Set Nutritional Goals");
         goalFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        goalFrame.setSize(500, 400);
+        goalFrame.setSize(600, 500);
         goalFrame.setLocationRelativeTo(null);
         
-        GoalSelectionUI goalSelectionUI = new GoalSelectionUI(goals);
+        // Pass existing goals so user can edit them
+        GoalSelectionUI goalSelectionUI = new GoalSelectionUI(userGoals != null ? userGoals : new ArrayList<>());
         
         // Add a save button to update goals and return to main menu
         JButton saveBtn = new JButton("Save Goals");
         saveBtn.addActionListener(e -> {
-            userGoals = goalSelectionUI.getSelectedGoals();
-            if (!userGoals.isEmpty()) {
-                JOptionPane.showMessageDialog(goalFrame, "Goals updated successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+            List<Goal> selectedGoals = goalSelectionUI.getSelectedGoals();
+            if (!selectedGoals.isEmpty()) {
+                // Save goals to database
+                if (currentUser != null) {
+                    goalDAO.saveGoals(currentUser.getUserID(), selectedGoals);
+                    userGoals = selectedGoals;
+                    JOptionPane.showMessageDialog(goalFrame, 
+                        "Goals saved successfully!\n" +
+                        "Your swap suggestions will now be based on these goals.", 
+                        "Success", 
+                        JOptionPane.INFORMATION_MESSAGE);
+                } else {
+                    JOptionPane.showMessageDialog(goalFrame, 
+                        "Error: No user profile loaded.", 
+                        "Error", 
+                        JOptionPane.ERROR_MESSAGE);
+                }
             } else {
-                JOptionPane.showMessageDialog(goalFrame, "Please select at least one goal.", "No Goals Selected", JOptionPane.WARNING_MESSAGE);
+                JOptionPane.showMessageDialog(goalFrame, 
+                    "Please add at least one goal using the 'Add Goal' button.", 
+                    "No Goals Selected", 
+                    JOptionPane.WARNING_MESSAGE);
                 return;
             }
             goalFrame.dispose(); // Close the goal selection window
@@ -174,55 +218,52 @@ public class Main {
     }
     
     private static void showMainMenu() {
-        // Only dispose if mainFrame already exists
-        if (mainFrame != null) {
-            mainFrame.dispose();
-        }
-        
+        if (mainFrame != null) mainFrame.dispose();
         mainFrame = new JFrame("NutriSci - Main Menu");
         mainFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        mainFrame.setSize(700, 500);
+        mainFrame.setSize(600, 400);
         mainFrame.setLocationRelativeTo(null);
-        
+
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
-        
+
         // Welcome message
         String userName = currentUser != null ? currentUser.getName() : "User";
         JLabel welcomeLabel = new JLabel("Welcome, " + userName + "!", SwingConstants.CENTER);
-        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 20));
+        welcomeLabel.setFont(new Font("Arial", Font.BOLD, 22));
         panel.add(welcomeLabel, BorderLayout.NORTH);
-        
+
         // Main menu buttons
-        JPanel menuPanel = new JPanel(new GridLayout(4, 2, 15, 15));
-        
+        JPanel menuPanel = new JPanel(new GridLayout(6, 1, 15, 15));
+
+        JButton goalsBtn = new JButton("Goals");
         JButton logMealBtn = new JButton("Log Meal");
-        JButton viewJournalBtn = new JButton("View Journal");
-        JButton swapFoodBtn = new JButton("Swap Food Items");
-        JButton viewChartsBtn = new JButton("View Charts");
-        JButton viewGoalsBtn = new JButton("View Goals");
-        JButton setGoalsBtn = new JButton("Set Goals");
-        JButton profileBtn = new JButton("Edit Profile");
+        JButton journalBtn = new JButton("View Journal");
+        JButton editProfileBtn = new JButton("Edit Profile");
+        JButton switchUserBtn = new JButton("Switch User");
         JButton exitBtn = new JButton("Exit");
-        
+
+        // Smart switching: enter setup interface when no goals set, enter view interface when goals exist
+        goalsBtn.addActionListener(e -> {
+            if (userGoals == null || userGoals.isEmpty()) {
+                showGoalSelectionFromMenu();
+            } else {
+                showGoalsDialog();
+            }
+        });
         logMealBtn.addActionListener(e -> showMealLogging());
-        viewJournalBtn.addActionListener(e -> showJournal());
-        swapFoodBtn.addActionListener(e -> showFoodSwap());
-        viewChartsBtn.addActionListener(e -> showCharts());
-        viewGoalsBtn.addActionListener(e -> showGoalsDialog());
-        setGoalsBtn.addActionListener(e -> showGoalSelectionFromMenu());
-        profileBtn.addActionListener(e -> showProfileDialog());
+        journalBtn.addActionListener(e -> showJournalPanel());
+        editProfileBtn.addActionListener(e -> showProfileDialog());
+        switchUserBtn.addActionListener(e -> switchToUserSelection());
         exitBtn.addActionListener(e -> System.exit(0));
-        
+
+        menuPanel.add(goalsBtn);
         menuPanel.add(logMealBtn);
-        menuPanel.add(viewJournalBtn);
-        menuPanel.add(swapFoodBtn);
-        menuPanel.add(viewChartsBtn);
-        menuPanel.add(viewGoalsBtn);
-        menuPanel.add(setGoalsBtn);
-        menuPanel.add(profileBtn);
+        menuPanel.add(journalBtn);
+        menuPanel.add(editProfileBtn);
+        menuPanel.add(switchUserBtn);
         menuPanel.add(exitBtn);
-        
+
         panel.add(menuPanel, BorderLayout.CENTER);
         mainFrame.add(panel);
         mainFrame.setVisible(true);
@@ -234,7 +275,8 @@ public class Main {
         mealFrame.setSize(800, 600);
         mealFrame.setLocationRelativeTo(null);
         
-        MealEntryPanel mealEntryPanel = new MealEntryPanel();
+        int userId = currentUser != null ? currentUser.getUserID() : 1;
+        MealEntryPanel mealEntryPanel = new MealEntryPanel(userId);
         
         // Add a back button
         JButton backBtn = new JButton("Back to Main Menu");
@@ -254,7 +296,29 @@ public class Main {
         journalFrame.setSize(800, 600);
         journalFrame.setLocationRelativeTo(null);
         
-        int userId = currentUser != null ? currentUser.getUserID() : 1;
+        int userId = currentUser != null ? currentUser.getUserID() : 4; // Use user 4 as default since that's where the meal data is
+        
+        // Debug: Check swapService status
+        System.out.println("=== showJournal() called ===");
+        System.out.println("Global swapService: " + (swapService != null ? "NOT NULL" : "NULL"));
+        
+        // Use the global swapService instance if available, otherwise create a new one
+        SwapService journalSwapService = swapService != null ? swapService : new SwapService();
+        System.out.println("journalSwapService: " + (journalSwapService != null ? "NOT NULL" : "NULL"));
+        
+        // Get the database adapter that was used to initialize swapService
+        DatabaseAdapter journalDatabaseAdapter = null;
+        if (swapService != null) {
+            // Try to get the database adapter from the existing connection
+            try {
+                journalDatabaseAdapter = new MySQLAdapter();
+                journalDatabaseAdapter.connect();
+                System.out.println("Created new DatabaseAdapter for JournalPanel");
+            } catch (Exception e) {
+                System.err.println("Failed to create DatabaseAdapter for JournalPanel: " + e.getMessage());
+            }
+        }
+        
         JournalPanel journalPanel = new JournalPanel(userId);
         
         // Add a back button
@@ -373,21 +437,15 @@ public class Main {
         chartFrame.setSize(600, 400);
         chartFrame.setLocationRelativeTo(null);
         
-        // Create sample data
-        Map<String, Double> dailyData = new HashMap<>();
-        dailyData.put("Calories", 1850.0);
-        dailyData.put("Protein", 85.0);
-        dailyData.put("Fiber", 25.0);
-        dailyData.put("Fat", 65.0);
-        
-        // Create chart
-        NutrientChartFactory factory = new NutrientChartFactory();
-        Chart chart = factory.createDailyNutrientChart(dailyData);
-        
-        if (chart instanceof SwingChart) {
-            chartFrame.add(((SwingChart) chart).getChartPanel());
-        }
-        
+        JTextArea chartArea = new JTextArea();
+        chartArea.setText("Daily Nutrition Breakdown:\n\n" +
+                         "Calories: 1850 / 2000 (92%)\n" +
+                         "Protein: 85g / 90g (94%)\n" +
+                         "Fiber: 25g / 30g (83%)\n" +
+                         "Fat: 65g / 70g (93%)\n" +
+                         "Sodium: 1400mg / 1500mg (93%)");
+        chartArea.setEditable(false);
+        chartFrame.add(new JScrollPane(chartArea));
         chartFrame.setVisible(true);
     }
     
@@ -397,14 +455,14 @@ public class Main {
         chartFrame.setLocationRelativeTo(null);
         
         JTextArea trendArea = new JTextArea();
-        trendArea.setText("Weekly Nutrition Trends:\n\n" +
-                         "Monday: 1850 calories\n" +
-                         "Tuesday: 1920 calories\n" +
+        trendArea.setText("Weekly Calorie Trends:\n\n" +
+                         "Monday: 1920 calories\n" +
+                         "Tuesday: 1850 calories\n" +
                          "Wednesday: 1780 calories\n" +
                          "Thursday: 1950 calories\n" +
                          "Friday: 1820 calories\n" +
                          "Saturday: 2100 calories\n" +
-                         "Sunday: 1750 calories\n\n" +
+                         "Sunday: 1880 calories\n\n" +
                          "Average: 1881 calories");
         trendArea.setEditable(false);
         chartFrame.add(new JScrollPane(trendArea));
@@ -444,7 +502,8 @@ public class Main {
         Chart chart = factory.createPlateChart(cfgData);
         
         if (chart instanceof SwingChart) {
-            chartFrame.add(((SwingChart) chart).getChartPanel());
+            SwingChart swingChart = (SwingChart) chart;
+            chartFrame.add(swingChart.getChartPanel());
         }
         
         chartFrame.setVisible(true);
@@ -464,12 +523,53 @@ public class Main {
             goalsText.append("No goals set. You can set goals from the main menu.");
         }
         
-        JOptionPane.showMessageDialog(mainFrame, goalsText.toString(), "Your Goals", JOptionPane.INFORMATION_MESSAGE);
+        // Create custom dialog with edit button
+        JDialog dialog = new JDialog(mainFrame, "Your Goals", true);
+        dialog.setLayout(new BorderLayout(10, 10));
+        dialog.setSize(400, 300);
+        dialog.setLocationRelativeTo(mainFrame);
+        
+        // Content panel
+        JPanel contentPanel = new JPanel(new BorderLayout(10, 10));
+        contentPanel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        
+        // Goals text
+        JTextArea goalsArea = new JTextArea(goalsText.toString());
+        goalsArea.setEditable(false);
+        goalsArea.setFont(new Font("Arial", Font.PLAIN, 12));
+        goalsArea.setBackground(dialog.getBackground());
+        goalsArea.setLineWrap(true);
+        goalsArea.setWrapStyleWord(true);
+        
+        JScrollPane scrollPane = new JScrollPane(goalsArea);
+        contentPanel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 5));
+        
+        JButton editBtn = new JButton("Edit Goals");
+        JButton okBtn = new JButton("OK");
+        
+        editBtn.addActionListener(e -> {
+            dialog.dispose();
+            showGoalSelectionFromMenu();
+        });
+        
+        okBtn.addActionListener(e -> dialog.dispose());
+        
+        buttonPanel.add(editBtn);
+        buttonPanel.add(okBtn);
+        contentPanel.add(buttonPanel, BorderLayout.SOUTH);
+        
+        dialog.add(contentPanel);
+        dialog.setVisible(true);
     }
     
     private static void showSettingsDialog() {
     	if (currentUser == null) {
-            JOptionPane.showMessageDialog(mainFrame, "No user profile loaded. Cannot open settings.");
+            JOptionPane.showOptionDialog(mainFrame, "No user profile loaded. Cannot open settings.", "No Profile", 
+                JOptionPane.WARNING_MESSAGE, JOptionPane.WARNING_MESSAGE, null, 
+                new String[]{"OK"}, "OK");
             return;
         }
 
@@ -495,12 +595,64 @@ public class Main {
             profileFrame.setSize(400, 400);
             profileFrame.setLocationRelativeTo(null);
             
-            EditProfilePanel profilePanel = new EditProfilePanel();
+            EditProfilePanel profilePanel = new EditProfilePanel(currentUser);
             profileFrame.add(profilePanel);
             profileFrame.setVisible(true);
         } else {
-            JOptionPane.showMessageDialog(mainFrame, "No profile loaded.", "Profile", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showOptionDialog(mainFrame, "No profile loaded.", "Profile", 
+                JOptionPane.WARNING_MESSAGE, JOptionPane.WARNING_MESSAGE, null, 
+                new String[]{"OK"}, "OK");
         }
+    }
+
+    private static void switchToUserSelection() {
+        // Clear current user but don't remove from database
+        currentUser = null;
+        userGoals = null;
+        UserProfileManager.getInstance().clearCurrentProfile();
+        
+        // Close main menu
+        if (mainFrame != null) {
+            mainFrame.dispose();
+        }
+        
+        // Show splash screen again
+        showSplashScreen();
+    }
+
+    // New: display journal panel
+    private static void showJournalPanel() {
+        JFrame journalFrame = new JFrame("Meal Journal");
+        journalFrame.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        journalFrame.setSize(700, 500);
+        journalFrame.setLocationRelativeTo(mainFrame);
+        // Assume current user ID is 1, actual can be obtained from currentUser.getUserID()
+        int userId = currentUser != null ? currentUser.getUserID() : 1;
+        
+        // Debug: Check swapService status
+        System.out.println("=== showJournalPanel() called ===");
+        System.out.println("Global swapService: " + (swapService != null ? "NOT NULL" : "NULL"));
+        
+        // Use the global swapService instance if available, otherwise create a new one
+        SwapService journalSwapService = swapService != null ? swapService : new SwapService();
+        System.out.println("journalSwapService: " + (journalSwapService != null ? "NOT NULL" : "NULL"));
+        
+        // Get the database adapter that was used to initialize swapService
+        DatabaseAdapter journalDatabaseAdapter = null;
+        if (swapService != null) {
+            // Try to get the database adapter from the existing connection
+            try {
+                journalDatabaseAdapter = new MySQLAdapter();
+                journalDatabaseAdapter.connect();
+                System.out.println("Created new DatabaseAdapter for JournalPanel");
+            } catch (Exception e) {
+                System.err.println("Failed to create DatabaseAdapter for JournalPanel: " + e.getMessage());
+            }
+        }
+        
+        view.JournalPanel journalPanel = new view.JournalPanel(userId);
+        journalFrame.add(journalPanel);
+        journalFrame.setVisible(true);
     }
 }
     

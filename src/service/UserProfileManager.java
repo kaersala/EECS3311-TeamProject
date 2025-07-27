@@ -31,6 +31,14 @@ public class UserProfileManager {
     }
 
     public void addProfile(UserProfile p) {
+        // Don't save to database here, assume it's already saved
+        profiles.add(p);
+        if (currentProfile == null) {
+            currentProfile = p;
+        }
+    }
+    
+    public void addProfileAndSave(UserProfile p) {
         db.saveProfile(p);
         profiles.add(p);
         if (currentProfile == null) {
@@ -79,11 +87,16 @@ public class UserProfileManager {
     public UserProfile getCurrentProfile() {
         return currentProfile;
     }
-    
-    public void setProfilesForTest(ArrayList<UserProfile> profiles) {
-        this.profiles = profiles;
-        if (!profiles.isEmpty()) {
-            this.currentProfile = profiles.get(0);
+
+    public void removeCurrentProfile() {
+        if (currentProfile != null) {
+            profiles.removeIf(p -> p.getUserID() == currentProfile.getUserID());
+            currentProfile = null;
         }
+    }
+
+    public void clearCurrentProfile() {
+        // Only clear the current profile reference, don't remove from profiles list
+        currentProfile = null;
     }
 }

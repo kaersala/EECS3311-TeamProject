@@ -13,7 +13,12 @@ public class UserProfileDAO implements IUserProfileDAO {
 
     public UserProfileDAO() {
         this.adapter = new MySQLAdapter();
+        try {
         this.adapter.connect();
+        } catch (Exception e) {
+            System.err.println("Warning: Could not connect to database: " + e.getMessage());
+            // Continue without database connection
+        }
     }
 
     @Override
@@ -39,13 +44,19 @@ public class UserProfileDAO implements IUserProfileDAO {
 
     @Override
     public void updateUserProfile(UserProfile profile) {
+        if (adapter instanceof MySQLAdapter) {
+            ((MySQLAdapter) adapter).updateProfile(profile);
+        } else {
         adapter.saveProfile(profile);
+        }
     }
 
     @Override
     public void deleteUserProfile(int userId) {
-        // This would need to be implemented in the DatabaseAdapter interface
-        // For now, we'll leave it as a placeholder
+        if (adapter instanceof MySQLAdapter) {
+            ((MySQLAdapter) adapter).deleteProfile(userId);
+        } else {
         System.out.println("Delete user profile functionality needs to be implemented in DatabaseAdapter");
+        }
     }
 }
