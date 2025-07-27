@@ -231,4 +231,36 @@ public class SwapStatusDAO {
         
         return mealIds;
     }
+    
+    /**
+     * Delete swap status record by meal ID
+     */
+    public boolean deleteSwapStatusByMealId(int mealId) {
+        String sql = "DELETE FROM swap_status WHERE meal_id = ?";
+        
+        try {
+            // Create a new connection for this operation
+            Connection conn = databaseAdapter.connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for deleting swap status");
+                return false;
+            }
+            
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, mealId);
+                
+                int result = stmt.executeUpdate();
+                return result >= 0; // Return true even if no rows were deleted
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
+            }
+            
+        } catch (SQLException e) {
+            System.err.println("Error deleting swap status by meal ID: " + e.getMessage());
+            return false;
+        }
+    }
 } 

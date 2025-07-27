@@ -1,44 +1,32 @@
 package view;
 
+import app.Main;
 import controller.MealLoggerController;
 import controller.UserProfileController;
+import dao.Implementations.MealDAO;
 import model.Goal;
-import model.SwapSuggestion;
 import model.meal.Meal;
 import model.meal.MealType;
-import chart.SwingChart;
-import backend.SwapEngine;
+import model.meal.IngredientEntry;
+import model.SwapSuggestion;
 import service.SwapService;
-import service.SwapService.NutritionComparison;
-import service.SwapService.NutrientChange;
-import view.MealEntryPanel;
+import dao.adapter.DatabaseAdapter;
+import chart.SwingChart;
 
 import javax.swing.*;
-import javax.swing.border.TitledBorder;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.DefaultCellEditor;
-
 import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
-import java.awt.event.MouseAdapter;
-import java.awt.event.MouseEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
+import java.sql.Date;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
-
-import controller.IMealLogger;
-import model.meal.IngredientEntry;
-import model.FoodItem;
-import dao.adapter.DatabaseAdapter;
-import dao.adapter.DatabaseManager;
-import dao.Implementations.MealDAO;
 
 public class JournalPanel extends JPanel {
     private JTable table;
@@ -163,8 +151,42 @@ public class JournalPanel extends JPanel {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         // Set up Delete button renderer and editor
+        // Set up table with custom renderer for delete column
         table.getColumnModel().getColumn(4).setCellRenderer(new DeleteButtonRenderer());
-        table.getColumnModel().getColumn(4).setCellEditor(new DeleteButtonEditor());
+        
+        // Add mouse listener for delete button clicks
+        table.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent e) {
+                int row = table.rowAtPoint(e.getPoint());
+                int col = table.columnAtPoint(e.getPoint());
+                
+                if (row >= 0 && col == 4) { // Delete column
+                    try {
+                        String dateStr = (String) table.getValueAt(row, 0);
+                        LocalDate date = LocalDate.parse(dateStr);
+                        
+                        // Confirm deletion
+                        int result = JOptionPane.showOptionDialog(SwingUtilities.getWindowAncestor(table),
+                            "Are you sure you want to delete all meals for " + date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")) + "?",
+                            "Confirm Delete",
+                            JOptionPane.YES_NO_OPTION,
+                            JOptionPane.QUESTION_MESSAGE,
+                            null,
+                            new String[]{"Yes", "No"},
+                            "No"
+                        );
+                        
+                        if (result == JOptionPane.YES_OPTION) {
+                            deleteMealsForDate(date);
+                        }
+                    } catch (Exception ex) {
+                        System.err.println("Error handling delete click: " + ex.getMessage());
+                        ex.printStackTrace();
+                    }
+                }
+            }
+        });
 
         table.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting() && table.getSelectedRow() != -1) {
@@ -234,7 +256,7 @@ public class JournalPanel extends JPanel {
                 String.format("%.0f", totalCalories),
                 String.format("%.0f", targetCalories),
                 status,
-                new JCheckBox()
+                "Delete"
             });
         }
     }
@@ -1006,81 +1028,112 @@ public class JournalPanel extends JPanel {
         List<SwapSuggestion> allSuggestions = generateSmartSwapSuggestions(dailyMeals, foodDatabase);
         
         if (allSuggestions.isEmpty()) {
+            JPanel noSuggestionsPanel = new JPanel(new BorderLayout());
             JLabel noSuggestionsLabel = new JLabel("No swap suggestions available for today's meals.");
             noSuggestionsLabel.setHorizontalAlignment(SwingConstants.CENTER);
             noSuggestionsLabel.setFont(new Font("Arial", Font.PLAIN, 14));
-            panel.add(noSuggestionsLabel, BorderLayout.CENTER);
-        } else {
-            // Create suggestions list
-            JTextArea suggestionsArea = new JTextArea();
-            suggestionsArea.setEditable(false);
-            suggestionsArea.setFont(new Font("SansSerif", Font.PLAIN, 12));
-            suggestionsArea.setLineWrap(true);
-            suggestionsArea.setWrapStyleWord(true);
-
-            StringBuilder sb = new StringBuilder();
-            sb.append("Swap Suggestions for Better Nutrition:\n\n");
-            
-            for (int i = 0; i < allSuggestions.size(); i++) {
-                SwapSuggestion suggestion = allSuggestions.get(i);
-                
-                // Get food names
-                model.FoodItem originalFood = foodDatabase.get(suggestion.getOriginal().getFoodID());
-                model.FoodItem replacementFood = foodDatabase.get(suggestion.getReplacement().getFoodID());
-                
-                String originalName = originalFood != null ? originalFood.getName() : "Unknown Food";
-                String replacementName = replacementFood != null ? replacementFood.getName() : "Unknown Food";
-                
-                // Simplified format with nutrient changes
-                sb.append(i + 1).append(". Replace: ").append(originalName).append(" (").append(suggestion.getOriginal().getQuantity()).append("g)\n");
-                sb.append("   With: ").append(replacementName).append(" (").append(suggestion.getReplacement().getQuantity()).append("g)\n");
-                
-                // Extract nutrient changes from the reason (remove the "Replace X with Y to" part)
-                String reason = suggestion.getReason();
-                if (reason.contains(" to ")) {
-                    String nutrientChanges = reason.substring(reason.indexOf(" to ") + 4);
-                    sb.append("   ").append(nutrientChanges).append("\n\n");
-                } else {
-                    sb.append("\n");
-                }
-            }
-            
-            sb.append("Note: These suggestions will help you meet your nutrition goals.\n");
-            sb.append("Click 'Apply All' to implement these changes in your database.");
-            
-            suggestionsArea.setText(sb.toString());
-            
-            JScrollPane scrollPane = new JScrollPane(suggestionsArea);
-            panel.add(scrollPane, BorderLayout.CENTER);
-            
-            // Add action buttons
-            JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-            JButton applyAllBtn = new JButton("Apply All Suggestions");
-            
-            applyAllBtn.addActionListener(e -> {
-                String[] options = {"Yes", "No"};
-                int result = JOptionPane.showOptionDialog(panel,
-                    "This will modify your meal records in the database.\nAre you sure you want to apply all suggestions?",
-                    "Confirm Changes",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.QUESTION_MESSAGE,
-                    null,
-                    options,
-                    options[0]
-                );
-                if (result == JOptionPane.YES_OPTION) {
-                    applyAllSuggestions(dailyMeals, allSuggestions);
-                    JOptionPane.showMessageDialog(panel,
-                        "All suggestions have been applied!\nYour meal records have been updated in the database.",
-                        "Changes Applied",
-                        JOptionPane.INFORMATION_MESSAGE);
-                }
-            });
-            
-            buttonPanel.add(applyAllBtn);
-            
-            panel.add(buttonPanel, BorderLayout.SOUTH);
+            noSuggestionsPanel.add(noSuggestionsLabel, BorderLayout.CENTER);
+            return noSuggestionsPanel;
         }
+        
+        // Create suggestions list
+        JTextArea suggestionsArea = new JTextArea();
+        suggestionsArea.setEditable(false);
+        suggestionsArea.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        suggestionsArea.setLineWrap(true);
+        suggestionsArea.setWrapStyleWord(true);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("Swap Suggestions for Better Nutrition:\n\n");
+        
+        for (int i = 0; i < allSuggestions.size(); i++) {
+            SwapSuggestion suggestion = allSuggestions.get(i);
+            
+            // Get food names
+            model.FoodItem originalFood = foodDatabase.get(suggestion.getOriginal().getFoodID());
+            model.FoodItem replacementFood = foodDatabase.get(suggestion.getReplacement().getFoodID());
+            
+            String originalName = originalFood != null ? originalFood.getName() : "Unknown Food";
+            String replacementName = replacementFood != null ? replacementFood.getName() : "Unknown Food";
+            
+            // Simplified format with nutrient changes
+            sb.append(i + 1).append(". Replace: ").append(originalName).append(" (").append(suggestion.getOriginal().getQuantity()).append("g)\n");
+            sb.append("   With: ").append(replacementName).append(" (").append(suggestion.getReplacement().getQuantity()).append("g)\n");
+            
+            // Extract nutrient changes from the reason (remove the "Replace X with Y to" part)
+            String reason = suggestion.getReason();
+            if (reason.contains(" to ")) {
+                String nutrientChanges = reason.substring(reason.indexOf(" to ") + 4);
+                sb.append("   ").append(nutrientChanges).append("\n\n");
+            } else {
+                sb.append("\n");
+            }
+        }
+        
+        sb.append("Note: These suggestions will help you meet your nutrition goals.\n");
+        sb.append("Click 'Apply All' to implement these changes in your database.");
+        
+        suggestionsArea.setText(sb.toString());
+        
+        JScrollPane scrollPane = new JScrollPane(suggestionsArea);
+        panel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Add action buttons
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton applyAllBtn = new JButton("Apply All Suggestions");
+        
+        applyAllBtn.addActionListener(e -> {
+            String[] options = {"Yes", "No"};
+            int result = JOptionPane.showOptionDialog(panel,
+                "This will modify your meal records in the database.\nAre you sure you want to apply all suggestions?",
+                "Confirm Changes",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE,
+                null,
+                options,
+                options[0]
+            );
+            if (result == JOptionPane.YES_OPTION) {
+                applyAllSuggestions(dailyMeals, allSuggestions);
+                
+                // Create custom dialog with English button
+                JDialog successDialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(panel), "Changes Applied", true);
+                successDialog.setLayout(new BorderLayout(15, 15));
+                successDialog.setSize(350, 150);
+                successDialog.setLocationRelativeTo(panel);
+                
+                // Message panel
+                JPanel messagePanel = new JPanel(new BorderLayout(10, 10));
+                messagePanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+                
+                // Icon and message
+                JLabel iconLabel = new JLabel("✓");
+                iconLabel.setFont(new Font("Arial", Font.BOLD, 24));
+                iconLabel.setForeground(new Color(0, 128, 0));
+                iconLabel.setHorizontalAlignment(SwingConstants.CENTER);
+                
+                JLabel messageLabel = new JLabel("<html><center>All suggestions have been applied!<br>Your meal records have been updated in the database.</center></html>");
+                messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+                messageLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+                
+                messagePanel.add(iconLabel, BorderLayout.NORTH);
+                messagePanel.add(messageLabel, BorderLayout.CENTER);
+                
+                // Button panel
+                JPanel buttonPanel2 = new JPanel(new FlowLayout(FlowLayout.CENTER));
+                JButton okButton = new JButton("OK");
+                okButton.addActionListener(evt -> successDialog.dispose());
+                buttonPanel2.add(okButton);
+                
+                successDialog.add(messagePanel, BorderLayout.CENTER);
+                successDialog.add(buttonPanel2, BorderLayout.SOUTH);
+                successDialog.setVisible(true);
+            }
+        });
+        
+        buttonPanel.add(applyAllBtn);
+        
+        panel.add(buttonPanel, BorderLayout.SOUTH);
         
         return panel;
     }
@@ -1215,7 +1268,7 @@ public class JournalPanel extends JPanel {
         } catch (Exception e) {
             System.err.println("Error restoring original meals: " + e.getMessage());
             e.printStackTrace();
-            JOptionPane.showMessageDialog(this,
+            showEnglishMessageDialog(this,
                 "Error restoring meals: " + e.getMessage(),
                 "Restore Error",
                 JOptionPane.ERROR_MESSAGE);
@@ -1223,101 +1276,167 @@ public class JournalPanel extends JPanel {
     }
     
     private void showDateRangeDialog(List<Meal> dailyMeals) {
-        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Select Date Range", true);
-        dialog.setLayout(new BorderLayout(10, 10));
-        dialog.setSize(300, 200);
+        JDialog dialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(this), "Apply Swaps to Date Range", true);
+        dialog.setLayout(new BorderLayout(15, 15));
+        dialog.setSize(350, 200);
         dialog.setLocationRelativeTo(this);
         
-        JPanel panel = new JPanel(new GridLayout(4, 2, 5, 5));
+        // Main panel
+        JPanel mainPanel = new JPanel(new BorderLayout(10, 10));
+        mainPanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
         
-        panel.add(new JLabel("From Date:"));
-        JTextField fromDateField = new JTextField("YYYY-MM-DD");
-        panel.add(fromDateField);
+        // Date selection panel
+        JPanel datePanel = new JPanel(new GridLayout(2, 2, 10, 10));
+        datePanel.setBorder(BorderFactory.createTitledBorder("Select Date Range"));
         
-        panel.add(new JLabel("To Date:"));
-        JTextField toDateField = new JTextField("YYYY-MM-DD");
-        panel.add(toDateField);
+        // From Date dropdown
+        JLabel fromLabel = new JLabel("From Date:");
+        JComboBox<String> fromCombo = new JComboBox<>();
         
-        JButton applyBtn = new JButton("Apply");
+        // To Date dropdown
+        JLabel toLabel = new JLabel("To Date:");
+        JComboBox<String> toCombo = new JComboBox<>();
+        
+        // Populate date options (last 30 days)
+        LocalDate today = LocalDate.now();
+        for (int i = 0; i < 30; i++) {
+            LocalDate date = today.minusDays(i);
+            String dateStr = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            fromCombo.addItem(dateStr);
+            toCombo.addItem(dateStr);
+        }
+        
+        // Set default values
+        fromCombo.setSelectedItem(today.minusDays(6).format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        toCombo.setSelectedItem(today.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+        
+        datePanel.add(fromLabel);
+        datePanel.add(fromCombo);
+        datePanel.add(toLabel);
+        datePanel.add(toCombo);
+        
+        // Button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton applyBtn = new JButton("Apply Swaps");
         JButton cancelBtn = new JButton("Cancel");
         
         applyBtn.addActionListener(e -> {
             try {
-                LocalDate fromDate = LocalDate.parse(fromDateField.getText());
-                LocalDate toDate = LocalDate.parse(toDateField.getText());
+                LocalDate fromDate = LocalDate.parse((String) fromCombo.getSelectedItem(), DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                LocalDate toDate = LocalDate.parse((String) toCombo.getSelectedItem(), DateTimeFormatter.ofPattern("yyyy-MM-dd"));
                 
                 if (fromDate.isAfter(toDate)) {
-                    JOptionPane.showMessageDialog(dialog, "From date must be before or equal to to date.", "Invalid Date Range", JOptionPane.ERROR_MESSAGE);
+                    showEnglishMessageDialog(dialog, 
+                        "From date must be before or equal to to date.", 
+                        "Invalid Date Range", 
+                        JOptionPane.ERROR_MESSAGE);
                     return;
                 }
                 
-                applySwapsToDateRange(fromDate, toDate, dailyMeals);
-                dialog.dispose();
+                // Confirm application
+                String[] options = {"Yes", "No"};
+                int result = JOptionPane.showOptionDialog(dialog,
+                    "This will apply swap suggestions to all dates from " + fromDate + " to " + toDate + ".\n" +
+                    "Existing meals will be overwritten. Are you sure?",
+                    "Confirm Application",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE,
+                    null,
+                    options,
+                    options[0]
+                );
+                
+                if (result == JOptionPane.YES_OPTION) {
+                    dialog.dispose();
+                    applySwapsToDateRange(fromDate, toDate, dailyMeals);
+                }
                 
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(dialog, "Please enter valid dates in YYYY-MM-DD format.", "Invalid Date Format", JOptionPane.ERROR_MESSAGE);
+                showEnglishMessageDialog(dialog, 
+                    "Error parsing dates. Please try again.", 
+                    "Date Error", 
+                    JOptionPane.ERROR_MESSAGE);
             }
         });
         
         cancelBtn.addActionListener(e -> dialog.dispose());
         
-        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         buttonPanel.add(applyBtn);
         buttonPanel.add(cancelBtn);
         
-        dialog.add(panel, BorderLayout.CENTER);
+        // Assemble dialog
+        mainPanel.add(datePanel, BorderLayout.CENTER);
+        
+        dialog.add(mainPanel, BorderLayout.CENTER);
         dialog.add(buttonPanel, BorderLayout.SOUTH);
+        
         dialog.setVisible(true);
     }
     
     private void applySwapsToDateRange(LocalDate fromDate, LocalDate toDate, List<Meal> originalMeals) {
         try {
-            // Get swap suggestions from original meals
-            Map<Integer, model.FoodItem> foodDatabase = getFoodDatabase();
-            List<SwapSuggestion> suggestions = generateSmartSwapSuggestions(originalMeals, foodDatabase);
+            System.out.println("DEBUG: Applying swaps to date range from " + fromDate + " to " + toDate);
             
-            if (suggestions.isEmpty()) {
-                JOptionPane.showMessageDialog(this, "No swap suggestions available for the selected date range.", "No Suggestions", JOptionPane.INFORMATION_MESSAGE);
-                return;
-            }
+            // Use the current swapped meals directly (not the original meals)
+            // These meals are already swapped and should be copied as-is
+            int datesProcessed = 0;
             
-            // Apply suggestions to all meals in the date range
-            List<Meal> allMeals = controller.getMealsForUser(userId);
-            int appliedCount = 0;
-            
-            for (Meal meal : allMeals) {
-                if (!meal.getDate().isBefore(fromDate) && !meal.getDate().isAfter(toDate)) {
-                    // Apply swaps to this meal
-                    List<SwapSuggestion> mealSuggestions = suggestions.stream()
-                        .filter(s -> s.getOriginal().getFoodID() == meal.getMealID())
-                        .toList();
+            // Process each date in the range
+            for (LocalDate date = fromDate; !date.isAfter(toDate); date = date.plusDays(1)) {
+                datesProcessed++;
+                
+                // Delete existing meals for this date (if any)
+                mealDAO.deleteMealsByDate(userId, date.toString());
+                
+                // Create new meals for this date by copying the current swapped meals exactly
+                for (Meal currentMeal : originalMeals) {
+                    // Create a new meal for this date with the exact same ingredients as the current swapped meal
+                    List<model.meal.IngredientEntry> newIngredients = new ArrayList<>();
                     
-                    if (!mealSuggestions.isEmpty()) {
-                        Meal modifiedMeal = swapService.applySwapsToMeal(meal.getMealID(), mealSuggestions, userId);
-                        if (modifiedMeal != null) {
-                            appliedCount++;
-                        }
+                    // Copy all ingredients exactly as they are in the current swapped meal
+                    for (model.meal.IngredientEntry currentIngredient : currentMeal.getIngredients()) {
+                        newIngredients.add(new model.meal.IngredientEntry(
+                            currentIngredient.getFoodID(), 
+                            currentIngredient.getQuantity()
+                        ));
+                    }
+                    
+                    // Create and save the new meal with the same type as the current meal
+                    Meal newMeal = controller.buildMeal(userId, date, currentMeal.getType(), newIngredients);
+                    controller.logMeal(newMeal);
+                    
+                    // Mark as swapped for potential rollback - only after meal is successfully saved
+                    if (newMeal.getMealID() > 0) {
+                        swapService.storeOriginalMealData(newMeal);
                     }
                 }
             }
             
-            // Refresh the meals list
+            // Refresh the meals list and table
             this.meals = controller.getMealsForUser(userId);
             if (this.meals == null) {
                 this.meals = new ArrayList<>();
             }
             populateDailySummaryTable();
             
+            // Show simple success message using JOptionPane with English text
             JOptionPane.showMessageDialog(this, 
-                "Applied swap suggestions to " + appliedCount + " meals from " + fromDate + " to " + toDate,
-                "Date Range Applied", 
+                "Successfully applied", 
+                "Application Complete", 
                 JOptionPane.INFORMATION_MESSAGE);
-                
+            
+            // Close the current dialog and return to summary
+            Window window = SwingUtilities.getWindowAncestor(this);
+            if (window != null) {
+                window.dispose();
+            }
+            
         } catch (Exception e) {
-            System.err.println("Error applying to date range: " + e.getMessage());
-            JOptionPane.showMessageDialog(this, 
-                "Error applying to date range: " + e.getMessage(),
-                "Error", 
+            System.err.println("Error applying swaps to date range: " + e.getMessage());
+            e.printStackTrace();
+            showEnglishMessageDialog(this,
+                "Error applying meal plan to date range: " + e.getMessage(),
+                "Application Error",
                 JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -1927,61 +2046,7 @@ public class JournalPanel extends JPanel {
         }
     }
     
-    // Delete button editor
-    private class DeleteButtonEditor extends DefaultCellEditor {
-        private JButton button;
-        private String label;
-        private boolean isPushed;
-        
-        public DeleteButtonEditor() {
-            super(new JCheckBox());
-            button = new JButton();
-            button.setOpaque(true);
-            button.addActionListener(e -> fireEditingStopped());
-        }
-        
-        @Override
-        public Component getTableCellEditorComponent(JTable table, Object value,
-                                                   boolean isSelected, int row, int column) {
-            label = "Delete";
-            button.setText(label);
-            button.setBackground(new Color(231, 76, 60)); // Red color
-            button.setForeground(Color.WHITE);
-            button.setFont(new Font("Arial", Font.BOLD, 12));
-            isPushed = true;
-            return button;
-        }
-        
-        @Override
-        public Object getCellEditorValue() {
-            if (isPushed) {
-                // Get the date from the table
-                String dateStr = (String) table.getValueAt(table.getSelectedRow(), 0);
-                LocalDate date = LocalDate.parse(dateStr);
-                
-                // Confirm deletion
-                int result = JOptionPane.showConfirmDialog(
-                    SwingUtilities.getWindowAncestor(table),
-                    "Are you sure you want to delete all meals for " + dateStr + "?",
-                    "Confirm Deletion",
-                    JOptionPane.YES_NO_OPTION,
-                    JOptionPane.WARNING_MESSAGE
-                );
-                
-                if (result == JOptionPane.YES_OPTION) {
-                    deleteMealsForDate(date);
-                }
-            }
-            isPushed = false;
-            return label;
-        }
-        
-        @Override
-        public boolean stopCellEditing() {
-            isPushed = false;
-            return super.stopCellEditing();
-        }
-    }
+
     
     private void deleteMealsForDate(LocalDate date) {
         try {
@@ -1998,7 +2063,17 @@ public class JournalPanel extends JPanel {
                 return;
             }
             
-            // Delete meals from database using the new method
+            // First, delete swap_status records for these meals to avoid foreign key constraint errors
+            dao.Implementations.SwapStatusDAO swapStatusDAO = new dao.Implementations.SwapStatusDAO(new dao.adapter.MySQLAdapter());
+            for (Meal meal : mealsToDelete) {
+                try {
+                    swapStatusDAO.deleteSwapStatusByMealId(meal.getMealID());
+                } catch (Exception e) {
+                    System.err.println("Warning: Could not delete swap status for meal " + meal.getMealID() + ": " + e.getMessage());
+                }
+            }
+            
+            // Then delete meals from database
             dao.Implementations.MealDAO mealDAO = new dao.Implementations.MealDAO();
             mealDAO.deleteMealsByDate(userId, date.toString());
             
@@ -2008,7 +2083,7 @@ public class JournalPanel extends JPanel {
                 this.meals = new ArrayList<>();
             }
             
-            // Refresh the table
+            // Refresh the table (editing is already stopped)
             populateDailySummaryTable();
             
             JOptionPane.showMessageDialog(this, 
@@ -2024,6 +2099,65 @@ public class JournalPanel extends JPanel {
                 "Error", 
                 JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    /**
+     * Create a custom message dialog with English buttons
+     */
+    private void showEnglishMessageDialog(Component parent, String message, String title, int messageType) {
+        // Find the top-level window
+        Window window = SwingUtilities.getWindowAncestor(parent);
+        if (window == null) {
+            // Fallback: create a new frame
+            window = new JFrame();
+        }
+        
+        JDialog dialog = new JDialog((Frame) window, title, true);
+        dialog.setLayout(new BorderLayout(15, 15));
+        dialog.setSize(400, 200);
+        dialog.setLocationRelativeTo(window);
+        
+        // Message panel
+        JPanel messagePanel = new JPanel(new BorderLayout(10, 10));
+        messagePanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
+        
+        // Icon based on message type
+        JLabel iconLabel = new JLabel();
+        iconLabel.setFont(new Font("Arial", Font.BOLD, 24));
+        iconLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        
+        switch (messageType) {
+            case JOptionPane.ERROR_MESSAGE:
+                iconLabel.setText("✗");
+                iconLabel.setForeground(new Color(255, 0, 0));
+                break;
+            case JOptionPane.WARNING_MESSAGE:
+                iconLabel.setText("⚠");
+                iconLabel.setForeground(new Color(255, 165, 0));
+                break;
+            case JOptionPane.INFORMATION_MESSAGE:
+            default:
+                iconLabel.setText("ℹ");
+                iconLabel.setForeground(new Color(0, 128, 255));
+                break;
+        }
+        
+        JLabel messageLabel = new JLabel("<html><center>" + message.replace("\n", "<br>") + "</center></html>");
+        messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        messageLabel.setFont(new Font("Arial", Font.PLAIN, 12));
+        
+        messagePanel.add(iconLabel, BorderLayout.NORTH);
+        messagePanel.add(messageLabel, BorderLayout.CENTER);
+        
+        // Button panel
+        JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JButton okButton = new JButton("OK");
+        okButton.addActionListener(e -> dialog.dispose());
+        buttonPanel.add(okButton);
+        
+        dialog.add(messagePanel, BorderLayout.CENTER);
+        dialog.add(buttonPanel, BorderLayout.SOUTH);
+        dialog.setVisible(true);
     }
 }
 

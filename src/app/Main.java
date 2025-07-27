@@ -31,6 +31,9 @@ public class Main {
     private static SwapService swapService;
     
     public static void main(String[] args) {
+        // Set English locale for the entire application
+        Locale.setDefault(Locale.ENGLISH);
+        
         // Initialize the application
         initializeApplication();
         

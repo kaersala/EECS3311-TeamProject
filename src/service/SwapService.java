@@ -564,29 +564,36 @@ public class SwapService {
     }
     
     /**
-     * Store original meal data for potential restoration
+     * Store original meal data for potential rollback
      * @param originalMeal The original meal to store
      */
-    private void storeOriginalMealData(Meal originalMeal) {
+    public void storeOriginalMealData(Meal originalMeal) {
         try {
             if (swapStatusDAO == null) {
                 System.err.println("Warning: SwapStatusDAO not initialized, cannot store original meal data");
                 return;
             }
             
-            // Create a simple format: FOOD_ID,QUANTITY;FOOD_ID,QUANTITY
+            // Check if meal has a valid ID
+            if (originalMeal.getMealID() <= 0) {
+                System.err.println("Warning: Meal has invalid ID (" + originalMeal.getMealID() + "), cannot store swap status");
+                return;
+            }
+            
             StringBuilder mealData = new StringBuilder();
-            mealData.append("ORIGINAL:");
+            mealData.append("ORIGINAL:"); // Simplified prefix
             
             for (IngredientEntry ingredient : originalMeal.getIngredients()) {
                 mealData.append(ingredient.getFoodID()).append(",").append(ingredient.getQuantity()).append(";");
             }
             
             String data = mealData.toString();
-            System.out.println("DEBUG: Storing original meal data: " + data);
+            System.out.println("DEBUG: Storing original meal data for meal " + originalMeal.getMealID() + ": " + data);
             
-            // Store in database
-            swapStatusDAO.markMealAsSwapped(originalMeal.getUserID(), originalMeal.getMealID(), originalMeal.getDate(), data);
+            boolean success = swapStatusDAO.markMealAsSwapped(originalMeal.getUserID(), originalMeal.getMealID(), originalMeal.getDate(), data);
+            if (!success) {
+                System.err.println("Warning: Failed to mark meal " + originalMeal.getMealID() + " as swapped");
+            }
             
         } catch (Exception e) {
             System.err.println("Error storing original meal data: " + e.getMessage());
