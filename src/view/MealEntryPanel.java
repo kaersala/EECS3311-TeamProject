@@ -434,6 +434,11 @@ public class MealEntryPanel extends JPanel {
         JScrollPane scrollPane = new JScrollPane(resultsList);
         scrollPane.setPreferredSize(new Dimension(450, 200));
         
+        // Add instruction label
+        JLabel instructionLabel = new JLabel("Click on a food item to select it, then enter quantity and click Confirm");
+        instructionLabel.setForeground(Color.GRAY);
+        instructionLabel.setHorizontalAlignment(SwingConstants.CENTER);
+        
         // ===== Quantity panel =====
         JPanel quantityPanel = new JPanel(new BorderLayout(5, 5));
         JTextField quantityField = new JTextField();
@@ -455,10 +460,11 @@ public class MealEntryPanel extends JPanel {
         // ===== Add components to dialog =====
         dialog.add(topPanel, BorderLayout.NORTH);
         
-        // Create center panel to hold both search and scroll pane
+        // Create center panel to hold search, instruction, and scroll pane
         JPanel centerPanel = new JPanel(new BorderLayout(5, 5));
         centerPanel.add(searchPanel, BorderLayout.NORTH);
-        centerPanel.add(scrollPane, BorderLayout.CENTER);
+        centerPanel.add(instructionLabel, BorderLayout.CENTER);
+        centerPanel.add(scrollPane, BorderLayout.SOUTH);
         dialog.add(centerPanel, BorderLayout.CENTER);
         
         dialog.add(bottomPanel, BorderLayout.SOUTH);
@@ -545,13 +551,19 @@ public class MealEntryPanel extends JPanel {
     
     private void performSearch(String searchText, String[] foodNames, DefaultListModel<String> listModel, JComboBox<String> mealTypeCombo) {
         String query = searchText.toLowerCase().trim();
-        MealType mealType = MealType.valueOf((String) mealTypeCombo.getSelectedItem());
+        
+        // Convert combo box selection to uppercase to match enum values
+        String selectedMealType = (String) mealTypeCombo.getSelectedItem();
+        MealType mealType = MealType.valueOf(selectedMealType.toUpperCase());
         
         if (query.isEmpty()) {
             // If search box is empty, show initial list
             showInitialItems(foodNames, listModel);
             return;
         }
+        
+        // Clear the list model before adding search results
+        listModel.clear();
         
         // Search for matching foods
         List<String> matchingFoods = new ArrayList<>();

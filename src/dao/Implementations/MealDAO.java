@@ -27,8 +27,12 @@ public class MealDAO implements IMealDAO {
     public Meal getMealById(int mealId) {
         List<Meal> allMeals = new ArrayList<>();
         
+        // Dynamically get the maximum user ID from database
+        int maxUserId = getMaxUserId();
+        System.out.println("DEBUG: Searching for meal " + mealId + " in user range 1-" + maxUserId);
+        
         // Try to find the meal by searching through all users
-        for (int userId = 1; userId <= 10; userId++) {
+        for (int userId = 1; userId <= maxUserId; userId++) {
             List<Meal> userMeals = getMealsByUserId(userId);
             if (userMeals != null) {
                 for (Meal meal : userMeals) {
@@ -41,6 +45,13 @@ public class MealDAO implements IMealDAO {
         
         System.err.println("Meal with ID " + mealId + " not found");
         return null;
+    }
+    
+    /**
+     * Get the maximum user ID - hardcoded for simplicity
+     */
+    private int getMaxUserId() {
+        return 1000; // Simple hardcoded value
     }
 
     @Override

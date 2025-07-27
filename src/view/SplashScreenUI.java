@@ -63,7 +63,7 @@ public class SplashScreenUI extends JFrame {
     }
 
     private void showProfileSelection(List<UserProfile> profiles) {
-        // Convert profiles to display names
+        // Convert profiles to display names (only show name, not ID)
         String[] profileNames = profiles.stream()
                 .map(UserProfile::getName)
                 .toArray(String[]::new);
@@ -125,7 +125,7 @@ public class SplashScreenUI extends JFrame {
             return;
         }
 
-        // Find the selected profile
+        // Find the selected profile by name
         List<UserProfile> profiles = profileManager.getProfiles();
         UserProfile selectedProfile = profiles.stream()
                 .filter(p -> p.getName().equals(selectedProfileName))
@@ -142,7 +142,7 @@ public class SplashScreenUI extends JFrame {
         profileManager.setCurrentProfile(selectedProfile.getUserID());
 
         // Show loading message with English buttons
-        JOptionPane.showOptionDialog(this, "Loading profile: " + selectedProfileName, "Loading", 
+        JOptionPane.showOptionDialog(this, "Loading profile: " + selectedProfile.getName(), "Loading", 
             JOptionPane.INFORMATION_MESSAGE, JOptionPane.INFORMATION_MESSAGE, null, 
             new String[]{"OK"}, "OK");
         

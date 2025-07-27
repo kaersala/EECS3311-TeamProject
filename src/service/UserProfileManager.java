@@ -31,6 +31,14 @@ public class UserProfileManager {
     }
 
     public void addProfile(UserProfile p) {
+        // Don't save to database here, assume it's already saved
+        profiles.add(p);
+        if (currentProfile == null) {
+            currentProfile = p;
+        }
+    }
+    
+    public void addProfileAndSave(UserProfile p) {
         db.saveProfile(p);
         profiles.add(p);
         if (currentProfile == null) {

@@ -263,4 +263,70 @@ public class SwapStatusDAO {
             return false;
         }
     }
+    
+    /**
+     * Get all swapped meals for a user
+     */
+    public List<SwapStatusRecord> getSwappedMeals(int userId) {
+        String sql = "SELECT meal_id, date, original_meal_data FROM swap_status WHERE user_id = ? AND is_swapped = TRUE ORDER BY date";
+        List<SwapStatusRecord> records = new ArrayList<>();
+        
+        try {
+            // Create a new connection for this operation
+            Connection conn = databaseAdapter.connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for getting swapped meals");
+                return records;
+            }
+            
+            System.out.println("=== SwapStatusDAO Debug ===");
+            System.out.println("Querying for user ID: " + userId);
+            
+            try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                stmt.setInt(1, userId);
+                
+                try (ResultSet rs = stmt.executeQuery()) {
+                    while (rs.next()) {
+                        SwapStatusRecord record = new SwapStatusRecord();
+                        record.setMealId(rs.getInt("meal_id"));
+                        record.setDate(rs.getDate("date").toLocalDate());
+                        record.setOriginalMealData(rs.getString("original_meal_data"));
+                        records.add(record);
+                        System.out.println("Found swapped meal: ID=" + record.getMealId() + ", Date=" + record.getDate());
+                    }
+                }
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
+            }
+            
+            System.out.println("Total swapped meals found: " + records.size());
+            
+        } catch (SQLException e) {
+            System.err.println("Error getting swapped meals: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return records;
+    }
+    
+    /**
+     * Record class for swap status data
+     */
+    public static class SwapStatusRecord {
+        private int mealId;
+        private LocalDate date;
+        private String originalMealData;
+        
+        public int getMealId() { return mealId; }
+        public void setMealId(int mealId) { this.mealId = mealId; }
+        
+        public LocalDate getDate() { return date; }
+        public void setDate(LocalDate date) { this.date = date; }
+        
+        public String getOriginalMealData() { return originalMealData; }
+        public void setOriginalMealData(String originalMealData) { this.originalMealData = originalMealData; }
+    }
 } 

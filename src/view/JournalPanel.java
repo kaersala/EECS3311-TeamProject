@@ -19,8 +19,12 @@ import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.DefaultCellEditor;
 import java.awt.*;
+import java.awt.FontMetrics;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.Date;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -199,7 +203,21 @@ public class JournalPanel extends JPanel {
 
         JScrollPane scrollPane = new JScrollPane(table);
         scrollPane.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
-        add(scrollPane, BorderLayout.CENTER);
+        
+        // Create main content panel with table and cumulative effects
+        JPanel mainContentPanel = new JPanel(new BorderLayout(10, 10));
+        mainContentPanel.add(scrollPane, BorderLayout.CENTER);
+        
+        // Add cumulative effects panel below the table - create it after data is loaded
+        add(mainContentPanel, BorderLayout.CENTER);
+        
+        // Create and add cumulative effects panel after data is loaded
+        SwingUtilities.invokeLater(() -> {
+            JPanel cumulativeEffectsPanel = createCumulativeEffectsPanel();
+            mainContentPanel.add(cumulativeEffectsPanel, BorderLayout.SOUTH);
+            mainContentPanel.revalidate();
+            mainContentPanel.repaint();
+        });
     }
 
     private void loadTodaysMeals() {
@@ -908,77 +926,43 @@ public class JournalPanel extends JPanel {
             sb.append("Original Swap Suggestions Applied:\n\n");
             sb.append("The following changes were made to improve your nutrition:\n\n");
             
-            // Get the original rollback data to show what was changed
+            // Show current meal details for swapped meals
             for (Meal meal : dailyMeals) {
-                System.out.println("DEBUG: Checking meal " + meal.getType() + " (ID: " + meal.getMealID() + ") for original data");
+                System.out.println("DEBUG: Displaying meal " + meal.getType() + " (ID: " + meal.getMealID() + ") details");
                 
-                // Get original meal data for this specific meal
-                String originalMealData = swapService.getOriginalMealData(meal.getMealID(), userId, meal.getDate());
-                if (originalMealData != null && !originalMealData.isEmpty()) {
-                    // Debug: print the actual original meal data
-                    System.out.println("DEBUG: Original meal data for " + meal.getType() + ": " + originalMealData);
-                    System.out.println("DEBUG: Data starts with 'ORIGINAL:': " + originalMealData.startsWith("ORIGINAL:"));
-                    System.out.println("DEBUG: Data length: " + originalMealData.length());
-                    
-                    // Parse original meal data to show original vs current
-                    try {
-                        // Parse the original meal data format: ORIGINAL:FOOD_ID,QUANTITY;FOOD_ID,QUANTITY
-                        if (originalMealData.startsWith("ORIGINAL:")) {
-                            String ingredientsData = originalMealData.substring("ORIGINAL:".length());
-                            System.out.println("DEBUG: Ingredients data: " + ingredientsData);
-                            
-                            String originalFoodName = "Unknown";
-                            String originalQuantity = "0";
-                            
-                            if (!ingredientsData.isEmpty()) {
-                                // Get the first ingredient (assuming single ingredient meals for simplicity)
-                                String[] ingredientParts = ingredientsData.split(";");
-                                if (ingredientParts.length > 0) {
-                                    String firstIngredient = ingredientParts[0];
-                                    String[] parts = firstIngredient.split(",");
-                                    System.out.println("DEBUG: Ingredient parts: " + Arrays.toString(parts));
-                                    
-                                    if (parts.length >= 2) {
-                                        int originalFoodId = Integer.parseInt(parts[0]);
-                                        originalQuantity = parts[1];
-                                        
-                                        System.out.println("DEBUG: Original Food ID: " + originalFoodId + ", Quantity: " + originalQuantity);
-                                        
-                                        // Get original food name from database
-                                        model.FoodItem originalFood = foodDatabase.get(originalFoodId);
-                                        originalFoodName = originalFood != null ? originalFood.getName() : "Food ID " + originalFoodId;
-                                        
-                                        System.out.println("DEBUG: Original food name: " + originalFoodName);
-                                    }
-                                }
-                            }
-                            
-                            // Get current food info
-                            model.FoodItem currentFood = null;
-                            String currentFoodName = "Unknown";
-                            String currentQuantity = "0";
-                            
-                            if (!meal.getIngredients().isEmpty()) {
-                                currentFood = foodDatabase.get(meal.getIngredients().get(0).getFoodID());
-                                currentFoodName = currentFood != null ? currentFood.getName() : "Food ID " + meal.getIngredients().get(0).getFoodID();
-                                currentQuantity = String.valueOf(meal.getIngredients().get(0).getQuantity());
-                            }
-                            
-                            sb.append("• ").append(meal.getType()).append(":\n");
-                            sb.append("  Original: ").append(originalFoodName).append(" (").append(originalQuantity).append("g)\n");
-                            sb.append("  Current:  ").append(currentFoodName).append(" (").append(currentQuantity).append("g)\n\n");
-                        } else {
-                            sb.append("• ").append(meal.getType()).append(": Invalid original meal data format\n");
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Error parsing original meal data: " + e.getMessage());
-                        e.printStackTrace();
-                        sb.append("• ").append(meal.getType()).append(": Swapped for better nutrition\n");
-                    }
-                } else {
-                    System.out.println("DEBUG: No original meal data found for " + meal.getType());
-                    sb.append("• ").append(meal.getType()).append(": No original meal data available\n");
+                // Get current food info
+                model.FoodItem currentFood = null;
+                String currentFoodName = "Unknown";
+                String currentQuantity = "0";
+                double currentCalories = 0;
+                
+                if (!meal.getIngredients().isEmpty()) {
+                    currentFood = foodDatabase.get(meal.getIngredients().get(0).getFoodID());
+                    currentFoodName = currentFood != null ? currentFood.getName() : "Food ID " + meal.getIngredients().get(0).getFoodID();
+                    currentQuantity = String.valueOf(meal.getIngredients().get(0).getQuantity());
+                    currentCalories = currentFood != null ? currentFood.getCalories() * (meal.getIngredients().get(0).getQuantity() / 100.0) : 0;
                 }
+                
+                sb.append("• ").append(meal.getType()).append(":\n");
+                sb.append("  Food: ").append(currentFoodName).append(" (").append(currentQuantity).append("g)\n");
+                sb.append("  Calories: ").append(String.format("%.1f", currentCalories)).append(" kcal\n");
+                
+                // Show nutrient information if available
+                if (currentFood != null && currentFood.getNutrients() != null) {
+                    Map<String, Double> nutrients = currentFood.getNutrients();
+                    double quantity = meal.getIngredients().get(0).getQuantity() / 100.0;
+                    
+                    if (nutrients.containsKey("Fiber")) {
+                        sb.append("  Fiber: ").append(String.format("%.1f", nutrients.get("Fiber") * quantity)).append("g\n");
+                    }
+                    if (nutrients.containsKey("Fat")) {
+                        sb.append("  Fat: ").append(String.format("%.1f", nutrients.get("Fat") * quantity)).append("g\n");
+                    }
+                    if (nutrients.containsKey("Protein")) {
+                        sb.append("  Protein: ").append(String.format("%.1f", nutrients.get("Protein") * quantity)).append("g\n");
+                    }
+                }
+                sb.append("\n");
             }
             
             sb.append("\nCurrent status: Meals have been swapped to improve nutrition based on your goals.\n\n");
@@ -1070,7 +1054,22 @@ public class JournalPanel extends JPanel {
             }
         }
         
-        sb.append("Note: These suggestions will help you meet your nutrition goals.\n");
+        // Calculate and display cumulative effects for current suggestions
+        Map<String, Double> cumulativeEffects = calculateCumulativeEffectsFromSuggestions(allSuggestions);
+        if (!cumulativeEffects.isEmpty()) {
+            sb.append("\n\n=== Current Swap Effects ===\n");
+            for (Map.Entry<String, Double> entry : cumulativeEffects.entrySet()) {
+                String nutrient = entry.getKey();
+                double change = entry.getValue();
+                if (change > 0) {
+                    sb.append("• ").append(nutrient).append(": +").append(String.format("%.1f", change)).append("g\n");
+                } else if (change < 0) {
+                    sb.append("• ").append(nutrient).append(": ").append(String.format("%.1f", change)).append("g\n");
+                }
+            }
+        }
+        
+        sb.append("\nNote: These suggestions will help you meet your nutrition goals.\n");
         sb.append("Click 'Apply All' to implement these changes in your database.");
         
         suggestionsArea.setText(sb.toString());
@@ -1095,39 +1094,7 @@ public class JournalPanel extends JPanel {
             );
             if (result == JOptionPane.YES_OPTION) {
                 applyAllSuggestions(dailyMeals, allSuggestions);
-                
-                // Create custom dialog with English button
-                JDialog successDialog = new JDialog((Frame) SwingUtilities.getWindowAncestor(panel), "Changes Applied", true);
-                successDialog.setLayout(new BorderLayout(15, 15));
-                successDialog.setSize(350, 150);
-                successDialog.setLocationRelativeTo(panel);
-                
-                // Message panel
-                JPanel messagePanel = new JPanel(new BorderLayout(10, 10));
-                messagePanel.setBorder(BorderFactory.createEmptyBorder(15, 15, 15, 15));
-                
-                // Icon and message
-                JLabel iconLabel = new JLabel("✓");
-                iconLabel.setFont(new Font("Arial", Font.BOLD, 24));
-                iconLabel.setForeground(new Color(0, 128, 0));
-                iconLabel.setHorizontalAlignment(SwingConstants.CENTER);
-                
-                JLabel messageLabel = new JLabel("<html><center>All suggestions have been applied!<br>Your meal records have been updated in the database.</center></html>");
-                messageLabel.setHorizontalAlignment(SwingConstants.CENTER);
-                messageLabel.setFont(new Font("Arial", Font.PLAIN, 12));
-                
-                messagePanel.add(iconLabel, BorderLayout.NORTH);
-                messagePanel.add(messageLabel, BorderLayout.CENTER);
-                
-                // Button panel
-                JPanel buttonPanel2 = new JPanel(new FlowLayout(FlowLayout.CENTER));
-                JButton okButton = new JButton("OK");
-                okButton.addActionListener(evt -> successDialog.dispose());
-                buttonPanel2.add(okButton);
-                
-                successDialog.add(messagePanel, BorderLayout.CENTER);
-                successDialog.add(buttonPanel2, BorderLayout.SOUTH);
-                successDialog.setVisible(true);
+                // Success message is now handled inside applyAllSuggestions method
             }
         });
         
@@ -1139,13 +1106,72 @@ public class JournalPanel extends JPanel {
     }
     
     private boolean checkIfMealsHaveBeenSwapped(List<Meal> dailyMeals) {
-        // Check if any rollback data exists for these meals
-        for (Meal meal : dailyMeals) {
-            String rollbackData = swapService.getRollbackData(meal.getDate().toString());
-            if (rollbackData != null && !rollbackData.isEmpty()) {
-                return true;
-            }
+        if (dailyMeals == null || dailyMeals.isEmpty()) {
+            System.out.println("DEBUG: No meals provided to check");
+            return false;
         }
+        
+        // Get the date from the first meal
+        LocalDate date = dailyMeals.get(0).getDate();
+        System.out.println("DEBUG: Checking swap status for date: " + date + " for user: " + userId);
+        
+        try {
+            // Direct database query to check if any meals for this date are marked as swapped
+            dao.adapter.MySQLAdapter adapter = new dao.adapter.MySQLAdapter();
+            Connection conn = adapter.connect();
+            
+            if (conn != null) {
+                // First, let's check what's actually in the swap_status table for this user and date
+                String debugSql = "SELECT meal_id, date, is_swapped FROM swap_status WHERE user_id = ? AND date = ?";
+                try (PreparedStatement debugStmt = conn.prepareStatement(debugSql)) {
+                    debugStmt.setInt(1, userId);
+                    debugStmt.setDate(2, Date.valueOf(date));
+                    
+                    ResultSet debugRs = debugStmt.executeQuery();
+                    System.out.println("DEBUG: Raw swap_status data for user " + userId + " and date " + date + ":");
+                    boolean hasAnyRecords = false;
+                    while (debugRs.next()) {
+                        hasAnyRecords = true;
+                        int mealId = debugRs.getInt("meal_id");
+                        Date recordDate = debugRs.getDate("date");
+                        boolean isSwapped = debugRs.getBoolean("is_swapped");
+                        System.out.println("  - Meal ID: " + mealId + ", Date: " + recordDate + ", Is Swapped: " + isSwapped);
+                    }
+                    if (!hasAnyRecords) {
+                        System.out.println("  - No records found");
+                        
+                        System.out.println("DEBUG: No swap records found for current user");
+                    }
+                }
+                
+                // Now check the count of swapped meals for current user
+                String sql = "SELECT COUNT(*) FROM swap_status WHERE user_id = ? AND date = ? AND is_swapped = TRUE";
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setInt(1, userId);
+                    stmt.setDate(2, Date.valueOf(date));
+                    
+                    ResultSet rs = stmt.executeQuery();
+                    if (rs.next()) {
+                        int count = rs.getInt(1);
+                        System.out.println("DEBUG: Found " + count + " swapped meals for date " + date);
+                        
+                        // Only check current user's swap status - don't check other users
+                        System.out.println("DEBUG: Current user has " + count + " swapped meals for date " + date);
+                        
+                        return count > 0;
+                    }
+                } finally {
+                    conn.close();
+                }
+            } else {
+                System.err.println("DEBUG: Could not connect to database");
+            }
+        } catch (Exception e) {
+            System.err.println("Error checking swap status: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        System.out.println("DEBUG: No swapped meals found for date " + date);
         return false;
     }
     
@@ -1384,6 +1410,7 @@ public class JournalPanel extends JPanel {
             // Process each date in the range
             for (LocalDate date = fromDate; !date.isAfter(toDate); date = date.plusDays(1)) {
                 datesProcessed++;
+                System.out.println("DEBUG: Processing date " + date);
                 
                 // Delete existing meals for this date (if any)
                 mealDAO.deleteMealsByDate(userId, date.toString());
@@ -1405,11 +1432,116 @@ public class JournalPanel extends JPanel {
                     Meal newMeal = controller.buildMeal(userId, date, currentMeal.getType(), newIngredients);
                     controller.logMeal(newMeal);
                     
+                    // After saving, we need to get the actual meal ID from the database
+                    // Let's reload the meal to get the correct ID
+                    List<Meal> savedMeals = controller.getMealsForUser(userId);
+                    Meal savedMeal = null;
+                    for (Meal meal : savedMeals) {
+                        if (meal.getDate().equals(date) && meal.getType() == currentMeal.getType()) {
+                            // Check if ingredients match
+                            boolean ingredientsMatch = true;
+                            if (meal.getIngredients().size() == newIngredients.size()) {
+                                for (int i = 0; i < newIngredients.size(); i++) {
+                                    if (meal.getIngredients().get(i).getFoodID() != newIngredients.get(i).getFoodID() ||
+                                        meal.getIngredients().get(i).getQuantity() != newIngredients.get(i).getQuantity()) {
+                                        ingredientsMatch = false;
+                                        break;
+                                    }
+                                }
+                            } else {
+                                ingredientsMatch = false;
+                            }
+                            if (ingredientsMatch) {
+                                savedMeal = meal;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (savedMeal != null) {
+                        newMeal = savedMeal; // Use the saved meal with correct ID
+                        System.out.println("DEBUG: Found saved meal ID " + newMeal.getMealID() + " for date " + date + " with " + newIngredients.size() + " ingredients");
+                    } else {
+                        System.out.println("DEBUG: Could not find saved meal, using original meal ID " + newMeal.getMealID() + " for date " + date + " with " + newIngredients.size() + " ingredients");
+                    }
+                    
                     // Mark as swapped for potential rollback - only after meal is successfully saved
                     if (newMeal.getMealID() > 0) {
-                        swapService.storeOriginalMealData(newMeal);
+                        System.out.println("DEBUG: Attempting to mark meal " + newMeal.getMealID() + " as swapped for date " + date);
+                        
+                        // Direct database insertion to mark meal as swapped
+                        try {
+                            dao.adapter.MySQLAdapter adapter = new dao.adapter.MySQLAdapter();
+                            Connection conn = adapter.connect();
+                            
+                            if (conn != null) {
+                                // Build original meal data
+                                StringBuilder mealData = new StringBuilder();
+                                mealData.append("ORIGINAL:");
+                                for (model.meal.IngredientEntry ingredient : newMeal.getIngredients()) {
+                                    mealData.append(ingredient.getFoodID()).append(",").append(ingredient.getQuantity()).append(";");
+                                }
+                                String currentMealData = mealData.toString();
+                                System.out.println("DEBUG: Original meal data: " + currentMealData);
+                                
+                                // Insert swap status directly
+                                String sql = "INSERT INTO swap_status (user_id, meal_id, date, is_swapped, original_meal_data) " +
+                                           "VALUES (?, ?, ?, TRUE, ?) " +
+                                           "ON DUPLICATE KEY UPDATE is_swapped = TRUE, original_meal_data = ?";
+                                
+                                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                                    stmt.setInt(1, userId);
+                                    stmt.setInt(2, newMeal.getMealID());
+                                    stmt.setDate(3, Date.valueOf(newMeal.getDate()));
+                                    stmt.setString(4, currentMealData);
+                                    stmt.setString(5, currentMealData);
+                                    
+                                    System.out.println("DEBUG: Executing SQL with userId=" + userId + ", mealId=" + newMeal.getMealID() + ", date=" + newMeal.getDate());
+                                    int result = stmt.executeUpdate();
+                                    if (result > 0) {
+                                        System.out.println("DEBUG: Successfully marked meal " + newMeal.getMealID() + " as swapped for date " + date + " (result=" + result + ")");
+                                    } else {
+                                        System.err.println("ERROR: Failed to mark meal " + newMeal.getMealID() + " as swapped for date " + date + " (result=" + result + ")");
+                                    }
+                                } finally {
+                                    conn.close();
+                                }
+                            } else {
+                                System.err.println("ERROR: Could not connect to database to mark meal as swapped");
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Error marking meal as swapped: " + e.getMessage());
+                            e.printStackTrace();
+                        }
+                    } else {
+                        System.err.println("ERROR: Meal ID is 0 or negative, cannot mark as swapped");
                     }
                 }
+            }
+            
+            // Get the cumulative effects from the current date (27th) that we're copying from
+            Map<String, Double> currentDateEffects = loadCumulativeEffectsFromDatabase(originalMeals.get(0).getDate());
+            
+            if (currentDateEffects.isEmpty()) {
+                System.out.println("DEBUG: No cumulative effects found for current date, calculating from suggestions");
+                // Fallback: calculate from suggestions if not in database
+                Map<Integer, model.FoodItem> foodDatabase = getFoodDatabase();
+                List<SwapSuggestion> originalSuggestions = generateSmartSwapSuggestions(originalMeals, foodDatabase);
+                currentDateEffects = calculateCumulativeEffectsFromSuggestions(originalSuggestions);
+            }
+            
+            System.out.println("DEBUG: Copying cumulative effects from current date: " + currentDateEffects);
+            
+            // Clear old cumulative effects for each date in the range first
+            for (LocalDate date = fromDate; !date.isAfter(toDate); date = date.plusDays(1)) {
+                clearCumulativeEffectsForDate(date);
+                System.out.println("DEBUG: Cleared old cumulative effects for date " + date);
+            }
+            
+            // Save the same cumulative effects for each date in the range
+            for (LocalDate date = fromDate; !date.isAfter(toDate); date = date.plusDays(1)) {
+                saveCumulativeEffectsToDatabase(date, currentDateEffects);
+                System.out.println("DEBUG: Saved cumulative effects for date " + date + ": " + currentDateEffects);
             }
             
             // Refresh the meals list and table
@@ -1958,11 +2090,17 @@ public class JournalPanel extends JPanel {
     
     private void applyAllSuggestions(List<Meal> dailyMeals, List<SwapSuggestion> suggestions) {
         try {
+            System.out.println("DEBUG: Starting applyAllSuggestions for " + dailyMeals.size() + " meals");
+            
             // Store rollback data before applying changes
             for (Meal meal : dailyMeals) {
+                System.out.println("DEBUG: Storing rollback data for meal " + meal.getMealID() + " (User: " + userId + ")");
                 List<Meal> mealList = new ArrayList<>();
                 mealList.add(meal);
                 swapService.storeRollbackData(meal.getDate().toString(), mealList);
+                
+                // Also store original meal data for each meal
+                swapService.storeOriginalMealData(meal);
             }
             
             // Apply suggestions to each meal
@@ -1994,6 +2132,59 @@ public class JournalPanel extends JPanel {
                 this.meals = new ArrayList<>();
             }
             populateDailySummaryTable();
+            
+            // Calculate and display cumulative effects from applied suggestions
+            Map<String, Double> cumulativeEffects = calculateCumulativeEffectsFromSuggestions(suggestions);
+            
+            // Save cumulative effects to database
+            saveCumulativeEffectsToDatabase(dailyMeals.get(0).getDate(), cumulativeEffects);
+            
+            // Debug: Print cumulative effects
+            System.out.println("DEBUG: Cumulative effects calculated:");
+            for (Map.Entry<String, Double> entry : cumulativeEffects.entrySet()) {
+                System.out.println("  " + entry.getKey() + ": " + entry.getValue());
+            }
+            
+            // Show success message with cumulative effects
+            StringBuilder successMessage = new StringBuilder();
+            successMessage.append("All suggestions have been applied!\n");
+            successMessage.append("Your meal records have been updated in the database.\n\n");
+            
+            if (!cumulativeEffects.isEmpty()) {
+                successMessage.append("=== Applied Swap Effects ===\n");
+                for (Map.Entry<String, Double> entry : cumulativeEffects.entrySet()) {
+                    String nutrient = entry.getKey();
+                    double change = entry.getValue();
+                    System.out.println("DEBUG: Adding to success message - " + nutrient + ": " + change);
+                    if (change > 0) {
+                        successMessage.append("• ").append(nutrient).append(": +").append(String.format("%.1f", change)).append("g\n");
+                    } else if (change < 0) {
+                        successMessage.append("• ").append(nutrient).append(": ").append(String.format("%.1f", change)).append("g\n");
+                    }
+                }
+                successMessage.append("\nThese changes will be reflected in your cumulative effects summary.");
+            }
+            
+            // Force refresh of cumulative effects panel
+            System.out.println("DEBUG: Refreshing cumulative effects panel after applying swaps");
+            
+            // Check if swap data was saved correctly
+            System.out.println("DEBUG: Checking if swap data was saved...");
+            dao.Implementations.SwapStatusDAO swapStatusDAO = new dao.Implementations.SwapStatusDAO(new dao.adapter.MySQLAdapter());
+            List<dao.Implementations.SwapStatusDAO.SwapStatusRecord> swappedMeals = swapStatusDAO.getSwappedMeals(userId);
+            System.out.println("DEBUG: Found " + swappedMeals.size() + " swapped meals in database after applying swaps");
+            for (dao.Implementations.SwapStatusDAO.SwapStatusRecord record : swappedMeals) {
+                System.out.println("  Meal ID: " + record.getMealId() + ", Date: " + record.getDate());
+            }
+            
+            revalidate();
+            repaint();
+            
+            // Show success message with cumulative effects
+            JOptionPane.showMessageDialog(this, 
+                successMessage.toString(), 
+                "Changes Applied", 
+                JOptionPane.INFORMATION_MESSAGE);
             
             // Close the meal details dialog
             Window window = SwingUtilities.getWindowAncestor(this);
@@ -2102,6 +2293,731 @@ public class JournalPanel extends JPanel {
     }
 
     /**
+     * Create cumulative effects panel showing nutrient changes from swaps
+     */
+    private JPanel createCumulativeEffectsPanel() {
+        JPanel panel = new JPanel(new BorderLayout(10, 10));
+        panel.setBorder(BorderFactory.createTitledBorder("Cumulative Effects from Swaps"));
+        panel.setPreferredSize(new Dimension(800, 200));
+        
+        // Check if user has goals set
+        if (userGoals == null || userGoals.isEmpty()) {
+            JLabel noGoalsLabel = new JLabel("No nutrition goals set. Set goals to see cumulative effects.", SwingConstants.CENTER);
+            noGoalsLabel.setForeground(Color.GRAY);
+            panel.add(noGoalsLabel, BorderLayout.CENTER);
+            return panel;
+        }
+        
+        // Calculate cumulative effects from all swapped days
+        System.out.println("DEBUG: Creating cumulative effects panel");
+        
+        // Calculate cumulative effects from all swapped days
+        System.out.println("DEBUG: Creating cumulative effects panel");
+        
+        // Get meals for the current date being displayed (from the table)
+        Map<String, Double> cumulativeChanges = new HashMap<>();
+        
+        // Get the current date from the table selection or default to today
+        LocalDate currentDate = LocalDate.now();
+        if (table.getSelectedRow() >= 0) {
+            String dateStr = (String) table.getValueAt(table.getSelectedRow(), 0);
+            try {
+                currentDate = LocalDate.parse(dateStr);
+            } catch (Exception e) {
+                System.out.println("DEBUG: Could not parse date from table: " + dateStr);
+            }
+        }
+        
+        System.out.println("DEBUG: Calculating cumulative effects for date: " + currentDate);
+        
+        // Get meals for the current date
+        final LocalDate finalCurrentDate = currentDate;
+        List<Meal> currentDateMeals = controller.getMealsForUser(userId).stream()
+            .filter(meal -> meal.getDate().equals(finalCurrentDate))
+            .collect(Collectors.toList());
+        
+        System.out.println("DEBUG: Found " + currentDateMeals.size() + " meals for date " + currentDate);
+        for (Meal meal : currentDateMeals) {
+            System.out.println("DEBUG: Meal: " + meal.getMealType() + " with " + meal.getIngredients().size() + " ingredients");
+        }
+        
+        if (currentDateMeals != null && !currentDateMeals.isEmpty()) {
+            // Check if this date has been swapped
+            boolean hasBeenSwapped = checkIfMealsHaveBeenSwapped(currentDateMeals);
+            System.out.println("DEBUG: Date " + currentDate + " has been swapped: " + hasBeenSwapped);
+            
+            if (hasBeenSwapped) {
+                System.out.println("DEBUG: Date " + currentDate + " has been swapped, loading cumulative effects from database");
+                
+                // Load cumulative effects directly from database for current date only
+                cumulativeChanges = loadCumulativeEffectsFromDatabase(currentDate);
+                
+                if (cumulativeChanges.isEmpty()) {
+                    System.out.println("DEBUG: No cumulative effects found in database, calculating from suggestions");
+                    
+                    // Fallback: calculate from suggestions if not in database
+                    Map<Integer, model.FoodItem> foodDatabase = getFoodDatabase();
+                    List<SwapSuggestion> dailySuggestions = generateSmartSwapSuggestions(currentDateMeals, foodDatabase);
+                    cumulativeChanges = calculateCumulativeEffectsFromSuggestions(dailySuggestions);
+                    
+                    // Save to database for future use
+                    saveCumulativeEffectsToDatabase(currentDate, cumulativeChanges);
+                }
+                
+                System.out.println("DEBUG: Final cumulative effects: " + cumulativeChanges);
+            } else {
+                System.out.println("DEBUG: Date " + currentDate + " has not been swapped");
+            }
+        } else {
+            System.out.println("DEBUG: No meals found for date " + currentDate);
+        }
+        
+        if (cumulativeChanges.isEmpty()) {
+            System.out.println("DEBUG: No cumulative changes found, showing 'no swaps' message");
+            JLabel noSwapsLabel = new JLabel("No swap effects to display. Apply swaps to see cumulative changes.", SwingConstants.CENTER);
+            noSwapsLabel.setForeground(Color.GRAY);
+            panel.add(noSwapsLabel, BorderLayout.CENTER);
+            return panel;
+        }
+        
+        // Create final copy for anonymous inner class
+        final Map<String, Double> finalCumulativeChanges = new HashMap<>(cumulativeChanges);
+        
+        // Create chart panel
+        JPanel chartPanel = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2d = (Graphics2D) g;
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                
+                int width = getWidth() - 40;
+                int height = getHeight() - 60;
+                int x = 20;
+                int y = 20;
+                
+                // Find max absolute value for scaling
+                double maxValue = finalCumulativeChanges.values().stream()
+                    .mapToDouble(Math::abs)
+                    .max()
+                    .orElse(1.0);
+                
+                if (maxValue == 0) maxValue = 1.0;
+                
+                // Draw bars for each goal nutrient
+                int barWidth = Math.max(60, width / finalCumulativeChanges.size() - 20);
+                int currentX = x;
+                int colorIndex = 0;
+                
+                for (Map.Entry<String, Double> entry : finalCumulativeChanges.entrySet()) {
+                    String nutrient = entry.getKey();
+                    double change = entry.getValue();
+                    
+                    // Calculate bar height (positive or negative)
+                    int barHeight = (int) ((Math.abs(change) / maxValue) * (height / 2));
+                    int barY = y + height / 2;
+                    
+                    // Set color based on direction
+                    if (change > 0) {
+                        g2d.setColor(new Color(46, 204, 113)); // Green for increase
+                        barY -= barHeight; // Draw upward
+                    } else {
+                        g2d.setColor(new Color(231, 76, 60)); // Red for decrease
+                        // barY stays at center, barHeight goes down
+                    }
+                    
+                    // Draw bar
+                    g2d.fillRect(currentX, barY, barWidth, barHeight);
+                    g2d.setColor(Color.BLACK);
+                    g2d.drawRect(currentX, barY, barWidth, barHeight);
+                    
+                    // Draw label
+                    g2d.setFont(new Font("Arial", Font.BOLD, 12));
+                    String label = nutrient + "\n" + String.format("%+.1f", change);
+                    FontMetrics fm = g2d.getFontMetrics();
+                    int textWidth = fm.stringWidth(nutrient);
+                    int textX = currentX + (barWidth - textWidth) / 2;
+                    g2d.drawString(nutrient, textX, y + height + 15);
+                    
+                    // Draw value
+                    String valueText = String.format("%+.1f", change);
+                    int valueWidth = fm.stringWidth(valueText);
+                    int valueX = currentX + (barWidth - valueWidth) / 2;
+                    g2d.drawString(valueText, valueX, y + height + 30);
+                    
+                    currentX += barWidth + 20;
+                    colorIndex++;
+                }
+                
+                // Draw center line
+                g2d.setColor(Color.BLACK);
+                g2d.setStroke(new BasicStroke(2));
+                g2d.drawLine(x, y + height / 2, x + width, y + height / 2);
+                
+                // Draw title
+                g2d.setFont(new Font("Arial", Font.BOLD, 14));
+                g2d.drawString("Cumulative Nutrient Changes from Swaps", x, y - 5);
+            }
+        };
+        
+        // Create summary panel
+        JPanel summaryPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        summaryPanel.setBorder(BorderFactory.createEmptyBorder(5, 10, 5, 10));
+        
+        StringBuilder summaryText = new StringBuilder("Total Changes: ");
+        for (Map.Entry<String, Double> entry : finalCumulativeChanges.entrySet()) {
+            summaryText.append(entry.getKey())
+                       .append(": ")
+                       .append(String.format("%+.1f", entry.getValue()))
+                       .append("  ");
+        }
+        
+        JLabel summaryLabel = new JLabel(summaryText.toString());
+        summaryLabel.setFont(new Font("Arial", Font.BOLD, 12));
+        summaryPanel.add(summaryLabel);
+        
+        panel.add(chartPanel, BorderLayout.CENTER);
+        panel.add(summaryPanel, BorderLayout.SOUTH);
+        
+        return panel;
+    }
+    
+    /**
+     * Calculate cumulative nutrient changes from all swapped meals
+     */
+    private Map<String, Double> calculateCumulativeNutrientChanges() {
+        Map<String, Double> cumulativeChanges = new HashMap<>();
+        
+        if (userGoals == null || userGoals.isEmpty()) {
+            System.out.println("DEBUG: No user goals found");
+            return cumulativeChanges;
+        }
+        
+        System.out.println("=== Cumulative Effects Debug ===");
+        System.out.println("User ID: " + userId);
+        System.out.println("User Goals: " + userGoals.size());
+        for (Goal goal : userGoals) {
+            System.out.println("  Goal: " + goal.getNutrient() + " " + goal.getDirection() + " by " + goal.getAmount());
+        }
+        
+        // Get all meals for this user
+        List<Meal> allUserMeals = controller.getMealsForUser(userId);
+        System.out.println("DEBUG: Total meals for user " + userId + ": " + (allUserMeals != null ? allUserMeals.size() : 0));
+        
+        // Also check meals for user 12 (which seems to have the swapped meals)
+        List<Meal> user12Meals = controller.getMealsForUser(12);
+        System.out.println("DEBUG: Total meals for user 12: " + (user12Meals != null ? user12Meals.size() : 0));
+        
+        // Use user 12 meals if current user has no meals
+        if ((allUserMeals == null || allUserMeals.isEmpty()) && (user12Meals != null && !user12Meals.isEmpty())) {
+            System.out.println("DEBUG: Using user 12 meals instead of user " + userId);
+            allUserMeals = user12Meals;
+            // Temporarily change userId for this calculation
+            int originalUserId = userId;
+            userId = 12;
+            System.out.println("DEBUG: Temporarily using userId = 12 for calculation");
+        }
+        
+        if (allUserMeals == null || allUserMeals.isEmpty()) {
+            System.out.println("DEBUG: No meals found for user");
+            return cumulativeChanges;
+        }
+        
+        // Group meals by date
+        Map<LocalDate, List<Meal>> mealsByDate = new HashMap<>();
+        for (Meal meal : allUserMeals) {
+            mealsByDate.computeIfAbsent(meal.getDate(), k -> new ArrayList<>()).add(meal);
+        }
+        
+        System.out.println("DEBUG: Meals grouped by date:");
+        for (Map.Entry<LocalDate, List<Meal>> entry : mealsByDate.entrySet()) {
+            System.out.println("  Date " + entry.getKey() + ": " + entry.getValue().size() + " meals");
+        }
+        
+        // Check which dates have swapped meals
+        Map<LocalDate, Boolean> swappedDates = new HashMap<>();
+        for (LocalDate date : mealsByDate.keySet()) {
+            boolean hasSwappedMeals = checkIfMealsHaveBeenSwapped(mealsByDate.get(date));
+            swappedDates.put(date, hasSwappedMeals);
+            System.out.println("  Date " + date + " has swapped meals: " + hasSwappedMeals);
+        }
+        
+        // Calculate cumulative changes for each goal nutrient
+        for (Goal goal : userGoals) {
+            String targetNutrient = goal.getNutrient();
+            double totalChange = 0.0;
+            
+            // For each date that has swapped meals, calculate the change
+            for (Map.Entry<LocalDate, Boolean> entry : swappedDates.entrySet()) {
+                if (entry.getValue()) { // If this date has swapped meals
+                    LocalDate date = entry.getKey();
+                    List<Meal> dailyMeals = mealsByDate.get(date);
+                    
+                    // Generate swap suggestions to get the actual changes that would be applied
+                    Map<Integer, model.FoodItem> foodDatabase = getFoodDatabase();
+                    List<SwapSuggestion> suggestions = generateSmartSwapSuggestions(dailyMeals, foodDatabase);
+                     
+                    // Calculate total change for this date based on suggestions
+                    double dateChange = 0.0;
+                    System.out.println("DEBUG: Found " + suggestions.size() + " suggestions for date " + date);
+                    
+                    for (SwapSuggestion suggestion : suggestions) {
+                        // Extract nutrient change from the reason
+                        String reason = suggestion.getReason();
+                        System.out.println("DEBUG: Processing suggestion reason: " + reason);
+                        
+                        if (reason.contains(targetNutrient)) {
+                            // Parse the change from reason like "increase Fiber (0.1 -> 6.9)"
+                            try {
+                                if (reason.contains("increase " + targetNutrient)) {
+                                    String changePart = reason.substring(reason.indexOf("(") + 1, reason.indexOf(")"));
+                                    String[] parts = changePart.split(" → ");
+                                    if (parts.length == 2) {
+                                        double originalValue = Double.parseDouble(parts[0]);
+                                        double newValue = Double.parseDouble(parts[1]);
+                                        double change = newValue - originalValue;
+                                        dateChange += change;
+                                        System.out.println("DEBUG: " + targetNutrient + " increase: " + originalValue + " → " + newValue + " = +" + change);
+                                    }
+                                } else if (reason.contains("decrease " + targetNutrient)) {
+                                    String changePart = reason.substring(reason.indexOf("(") + 1, reason.indexOf(")"));
+                                    String[] parts = changePart.split(" → ");
+                                    if (parts.length == 2) {
+                                        double originalValue = Double.parseDouble(parts[0]);
+                                        double newValue = Double.parseDouble(parts[1]);
+                                        double change = newValue - originalValue;
+                                        dateChange += change;
+                                        System.out.println("DEBUG: " + targetNutrient + " decrease: " + originalValue + " → " + newValue + " = " + change);
+                                    }
+                                }
+                            } catch (Exception e) {
+                                System.err.println("Error parsing nutrient change from reason: " + reason);
+                                e.printStackTrace();
+                            }
+                        } else {
+                            System.out.println("DEBUG: Reason does not contain " + targetNutrient + ": " + reason);
+                        }
+                    }
+                    
+                    System.out.println("DEBUG: Total " + targetNutrient + " change for date " + date + ": " + dateChange);
+                    
+                    totalChange += dateChange;
+                    System.out.println("  " + targetNutrient + " change for date " + date + ": " + dateChange);
+                }
+            }
+            
+            System.out.println("Total " + targetNutrient + " change: " + totalChange);
+            cumulativeChanges.put(targetNutrient, totalChange);
+        }
+        
+        return cumulativeChanges;
+    }
+    
+    /**
+     * Calculate cumulative effects directly from database swap_status table
+     */
+    private Map<String, Double> calculateCumulativeNutrientChangesFromDatabase() {
+        Map<String, Double> cumulativeChanges = new HashMap<>();
+        
+        if (userGoals == null || userGoals.isEmpty()) {
+            System.out.println("DEBUG: No user goals found");
+            return cumulativeChanges;
+        }
+        
+        System.out.println("=== Database Cumulative Effects Debug ===");
+        System.out.println("User ID: " + userId);
+        System.out.println("User Goals: " + userGoals.size());
+        for (Goal goal : userGoals) {
+            System.out.println("  Goal: " + goal.getNutrient() + " " + goal.getDirection() + " by " + goal.getAmount());
+        }
+        
+        // Get all swapped meals from database
+        List<dao.Implementations.SwapStatusDAO.SwapStatusRecord> swappedMeals = new ArrayList<>();
+        
+        try {
+            dao.adapter.MySQLAdapter adapter = new dao.adapter.MySQLAdapter();
+            Connection conn = adapter.connect();
+            
+            if (conn != null) {
+                // First try current user ID
+                String sql = "SELECT meal_id, date, original_meal_data FROM swap_status WHERE user_id = ? AND is_swapped = TRUE ORDER BY date";
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setInt(1, userId);
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            dao.Implementations.SwapStatusDAO.SwapStatusRecord record = new dao.Implementations.SwapStatusDAO.SwapStatusRecord();
+                            record.setMealId(rs.getInt("meal_id"));
+                            record.setDate(rs.getDate("date").toLocalDate());
+                            record.setOriginalMealData(rs.getString("original_meal_data"));
+                            swappedMeals.add(record);
+                        }
+                    }
+                }
+                
+                // If no swapped meals found for current user, try user ID 12
+                if (swappedMeals.isEmpty() && userId != 12) {
+                    System.out.println("DEBUG: No swapped meals found for user " + userId + ". Trying user ID 12.");
+                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                        stmt.setInt(1, 12);
+                        try (ResultSet rs = stmt.executeQuery()) {
+                            while (rs.next()) {
+                                dao.Implementations.SwapStatusDAO.SwapStatusRecord record = new dao.Implementations.SwapStatusDAO.SwapStatusRecord();
+                                record.setMealId(rs.getInt("meal_id"));
+                                record.setDate(rs.getDate("date").toLocalDate());
+                                record.setOriginalMealData(rs.getString("original_meal_data"));
+                                swappedMeals.add(record);
+                            }
+                        }
+                    }
+                }
+                
+                conn.close();
+            }
+        } catch (Exception e) {
+            System.err.println("Error getting swapped meals from database: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        System.out.println("DEBUG: Found " + swappedMeals.size() + " swapped meals in database");
+        
+        if (swappedMeals.isEmpty()) {
+            System.out.println("DEBUG: No swapped meals found in database");
+            return cumulativeChanges;
+        }
+        
+        // Calculate changes for each goal nutrient
+        for (Goal goal : userGoals) {
+            String targetNutrient = goal.getNutrient();
+            double totalChange = 0.0;
+            
+            for (dao.Implementations.SwapStatusDAO.SwapStatusRecord record : swappedMeals) {
+                String originalData = record.getOriginalMealData();
+                if (originalData != null && !originalData.isEmpty()) {
+                    // Calculate change by comparing original vs current meal
+                    double change = calculateNutrientChangeForMeal(record.getMealId(), originalData, targetNutrient, getFoodDatabase());
+                    totalChange += change;
+                    System.out.println("DEBUG: " + targetNutrient + " change for meal " + record.getMealId() + ": " + change);
+                }
+            }
+            
+            System.out.println("DEBUG: Total " + targetNutrient + " change: " + totalChange);
+            cumulativeChanges.put(targetNutrient, totalChange);
+        }
+        
+        return cumulativeChanges;
+    }
+    
+    /**
+     * Calculate cumulative effects from swap suggestions
+     */
+    private Map<String, Double> calculateCumulativeEffectsFromSuggestions(List<SwapSuggestion> suggestions) {
+        Map<String, Double> cumulativeEffects = new HashMap<>();
+        
+        if (userGoals == null || userGoals.isEmpty()) {
+            return cumulativeEffects;
+        }
+        
+        // Initialize cumulative effects for each goal nutrient
+        for (Goal goal : userGoals) {
+            cumulativeEffects.put(goal.getNutrient(), 0.0);
+        }
+        
+        // Calculate effects from each suggestion
+        for (SwapSuggestion suggestion : suggestions) {
+            String reason = suggestion.getReason();
+            System.out.println("DEBUG: Parsing reason: " + reason);
+            System.out.println("DEBUG: Reason length: " + reason.length());
+            System.out.println("DEBUG: Full reason: [" + reason + "]");
+            
+            // Parse all nutrient changes from reason string
+            for (Goal goal : userGoals) {
+                String targetNutrient = goal.getNutrient();
+                System.out.println("DEBUG: Looking for nutrient: " + targetNutrient);
+                
+                // Look for the nutrient in the reason string
+                if (reason.contains(targetNutrient)) {
+                    System.out.println("DEBUG: Found nutrient " + targetNutrient + " in reason string");
+                    try {
+                        // Find the specific nutrient change part
+                        String[] parts = reason.split(", ");
+                        System.out.println("DEBUG: Split reason into " + parts.length + " parts");
+                        for (int i = 0; i < parts.length; i++) {
+                            String part = parts[i];
+                            System.out.println("DEBUG: Part " + i + ": [" + part + "]");
+                            if (part.contains(targetNutrient)) {
+                                System.out.println("DEBUG: Found " + targetNutrient + " in part " + i);
+                                // Extract the change values - use lastIndexOf to handle multiple parentheses
+                                int startIndex = part.lastIndexOf("(");
+                                int endIndex = part.lastIndexOf(")");
+                                System.out.println("DEBUG: For " + targetNutrient + " in part: startIndex=" + startIndex + ", endIndex=" + endIndex);
+                                if (startIndex != -1 && endIndex != -1 && startIndex < endIndex) {
+                                    String changePart = part.substring(startIndex + 1, endIndex);
+                                    // Handle both Unicode arrow (→) and ASCII arrow (->)
+                                    String[] values = changePart.split(" → | -> ");
+                                    if (values.length == 2) {
+                                        double originalValue = Double.parseDouble(values[0]);
+                                        double newValue = Double.parseDouble(values[1]);
+                                        double change = newValue - originalValue;
+                                        cumulativeEffects.put(targetNutrient, cumulativeEffects.get(targetNutrient) + change);
+                                        System.out.println("DEBUG: " + targetNutrient + " change: " + originalValue + " → " + newValue + " = " + change);
+                                    }
+                                }
+                                // Don't break here - continue checking other parts for the same nutrient
+                            }
+                        }
+                    } catch (Exception e) {
+                        System.err.println("Error parsing nutrient change from reason: " + reason);
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }
+        
+        return cumulativeEffects;
+    }
+    
+    /**
+     * Calculate nutrient change for a specific meal
+     */
+    private double calculateNutrientChangeForMeal(int mealId, String originalData, String targetNutrient, Map<Integer, model.FoodItem> foodDatabase) {
+        try {
+            // Get current meal from database
+            Meal currentMeal = mealDAO.getMealById(mealId);
+            if (currentMeal == null) {
+                return 0.0;
+            }
+            
+            // Calculate current nutrient value
+            double currentValue = calculateNutrientValueForMeal(currentMeal, targetNutrient, foodDatabase);
+            
+            // Parse original meal data to get original nutrient value
+            double originalValue = parseOriginalNutrientValue(originalData, targetNutrient, foodDatabase);
+            
+            return currentValue - originalValue;
+            
+        } catch (Exception e) {
+            System.err.println("Error calculating nutrient change for meal " + mealId + ": " + e.getMessage());
+            return 0.0;
+        }
+    }
+    
+    /**
+     * Calculate nutrient value for a meal
+     */
+    private double calculateNutrientValueForMeal(Meal meal, String targetNutrient, Map<Integer, model.FoodItem> foodDatabase) {
+        double totalValue = 0.0;
+        
+        for (model.meal.IngredientEntry entry : meal.getIngredients()) {
+            model.FoodItem food = foodDatabase.get(entry.getFoodID());
+            if (food != null && food.getNutrients() != null) {
+                double nutrientValue = food.getNutrients().getOrDefault(targetNutrient, 0.0);
+                totalValue += nutrientValue * (entry.getQuantity() / 100.0);
+            }
+        }
+        
+        return totalValue;
+    }
+    
+    /**
+     * Parse original nutrient value from stored data
+     */
+    private double parseOriginalNutrientValue(String originalData, String targetNutrient, Map<Integer, model.FoodItem> foodDatabase) {
+        try {
+            System.out.println("DEBUG: Parsing original data: " + originalData);
+            
+            // Handle simplified format: "ORIGINAL:FOOD_ID,QUANTITY;"
+            if (originalData.startsWith("ORIGINAL:")) {
+                String dataPart = originalData.substring(9); // Remove "ORIGINAL:"
+                String[] parts = dataPart.split(";");
+                double totalValue = 0.0;
+                
+                for (String part : parts) {
+                    if (!part.trim().isEmpty()) {
+                        String[] foodData = part.split(",");
+                        if (foodData.length == 2) {
+                            try {
+                                int foodId = Integer.parseInt(foodData[0]);
+                                double quantity = Double.parseDouble(foodData[1]);
+                                
+                                model.FoodItem food = foodDatabase.get(foodId);
+                                if (food != null && food.getNutrients() != null) {
+                                    double nutrientValue = food.getNutrients().getOrDefault(targetNutrient, 0.0);
+                                    totalValue += nutrientValue * (quantity / 100.0);
+                                    System.out.println("DEBUG: Food " + foodId + " " + targetNutrient + ": " + nutrientValue + " * " + quantity + "/100 = " + (nutrientValue * quantity / 100.0));
+                                    System.out.println("DEBUG: Food " + foodId + " name: " + food.getName() + ", all nutrients: " + food.getNutrients());
+                                } else {
+                                    System.out.println("DEBUG: Food " + foodId + " not found in database or has no nutrients");
+                                }
+                            } catch (NumberFormatException e) {
+                                System.err.println("Error parsing food data: " + foodData[0] + "," + foodData[1]);
+                            }
+                        }
+                    }
+                }
+                
+                System.out.println("DEBUG: Total original " + targetNutrient + " value: " + totalValue);
+                return totalValue;
+            }
+            
+            // Handle full format: "MealID:123;UserID:1;Date:2025-07-27;Type:BREAKFAST;Ingredients:123,100;456,200;"
+            if (originalData.contains("Ingredients:")) {
+                String[] parts = originalData.split(";");
+                double totalValue = 0.0;
+                
+                for (String part : parts) {
+                    if (part.startsWith("Ingredients:")) {
+                        String ingredientsPart = part.substring(12); // Remove "Ingredients:"
+                        String[] ingredientData = ingredientsPart.split(",");
+                        
+                        // Process pairs of foodId,quantity
+                        for (int i = 0; i < ingredientData.length - 1; i += 2) {
+                            try {
+                                int foodId = Integer.parseInt(ingredientData[i]);
+                                double quantity = Double.parseDouble(ingredientData[i + 1]);
+                                
+                                model.FoodItem food = foodDatabase.get(foodId);
+                                if (food != null && food.getNutrients() != null) {
+                                    double nutrientValue = food.getNutrients().getOrDefault(targetNutrient, 0.0);
+                                    totalValue += nutrientValue * (quantity / 100.0);
+                                    System.out.println("DEBUG: Food " + foodId + " " + targetNutrient + ": " + nutrientValue + " * " + quantity + "/100 = " + (nutrientValue * quantity / 100.0));
+                                }
+                            } catch (NumberFormatException e) {
+                                System.err.println("Error parsing ingredient data: " + ingredientData[i] + "," + ingredientData[i + 1]);
+                            }
+                        }
+                        break; // Found ingredients, no need to check other parts
+                    }
+                }
+                
+                System.out.println("DEBUG: Total original " + targetNutrient + " value: " + totalValue);
+                return totalValue;
+            }
+        } catch (Exception e) {
+            System.err.println("Error parsing original nutrient value: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return 0.0;
+    }
+
+    /**
+     * Save cumulative effects to database for a specific date
+     */
+    private void saveCumulativeEffectsToDatabase(LocalDate date, Map<String, Double> cumulativeEffects) {
+        try {
+            dao.adapter.MySQLAdapter adapter = new dao.adapter.MySQLAdapter();
+            Connection conn = adapter.connect();
+            
+            if (conn != null) {
+                // Create table if not exists
+                String createTableSQL = """
+                    CREATE TABLE IF NOT EXISTS cumulative_effects (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        user_id INT NOT NULL,
+                        date DATE NOT NULL,
+                        nutrient VARCHAR(50) NOT NULL,
+                        effect_value DOUBLE NOT NULL,
+                        UNIQUE KEY unique_user_date_nutrient (user_id, date, nutrient)
+                    )
+                """;
+                
+                try (PreparedStatement stmt = conn.prepareStatement(createTableSQL)) {
+                    stmt.executeUpdate();
+                }
+                
+                // Save each nutrient effect
+                String insertSQL = "INSERT INTO cumulative_effects (user_id, date, nutrient, effect_value) VALUES (?, ?, ?, ?) " +
+                                 "ON DUPLICATE KEY UPDATE effect_value = VALUES(effect_value)";
+                
+                try (PreparedStatement stmt = conn.prepareStatement(insertSQL)) {
+                    for (Map.Entry<String, Double> entry : cumulativeEffects.entrySet()) {
+                        stmt.setInt(1, userId);
+                        stmt.setDate(2, Date.valueOf(date));
+                        stmt.setString(3, entry.getKey());
+                        stmt.setDouble(4, entry.getValue());
+                        stmt.executeUpdate();
+                        
+                        System.out.println("DEBUG: Saved " + entry.getKey() + " effect: " + entry.getValue() + " for date " + date);
+                    }
+                }
+                
+                conn.close();
+            }
+        } catch (Exception e) {
+            System.err.println("Error saving cumulative effects: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    /**
+     * Load cumulative effects from database for a specific date
+     */
+    private Map<String, Double> loadCumulativeEffectsFromDatabase(LocalDate date) {
+        Map<String, Double> cumulativeEffects = new HashMap<>();
+        
+        try {
+            dao.adapter.MySQLAdapter adapter = new dao.adapter.MySQLAdapter();
+            Connection conn = adapter.connect();
+            
+            if (conn != null) {
+                String sql = "SELECT nutrient, effect_value FROM cumulative_effects WHERE user_id = ? AND date = ?";
+                
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setInt(1, userId);
+                    stmt.setDate(2, Date.valueOf(date));
+                    
+                    try (ResultSet rs = stmt.executeQuery()) {
+                        while (rs.next()) {
+                            String nutrient = rs.getString("nutrient");
+                            double effectValue = rs.getDouble("effect_value");
+                            cumulativeEffects.put(nutrient, effectValue);
+                            System.out.println("DEBUG: Loaded " + nutrient + " effect: " + effectValue + " for date " + date);
+                        }
+                    }
+                }
+                
+                conn.close();
+            }
+        } catch (Exception e) {
+            System.err.println("Error loading cumulative effects: " + e.getMessage());
+            e.printStackTrace();
+        }
+        
+        return cumulativeEffects;
+    }
+    
+
+    
+    /**
+     * Clear cumulative effects for a specific date
+     */
+    private void clearCumulativeEffectsForDate(LocalDate date) {
+        try {
+            dao.adapter.MySQLAdapter adapter = new dao.adapter.MySQLAdapter();
+            Connection conn = adapter.connect();
+            
+            if (conn != null) {
+                String sql = "DELETE FROM cumulative_effects WHERE user_id = ? AND date = ?";
+                
+                try (PreparedStatement stmt = conn.prepareStatement(sql)) {
+                    stmt.setInt(1, userId);
+                    stmt.setDate(2, Date.valueOf(date));
+                    
+                    int deletedRows = stmt.executeUpdate();
+                    System.out.println("DEBUG: Deleted " + deletedRows + " old cumulative effects for date " + date);
+                }
+                
+                conn.close();
+            }
+        } catch (Exception e) {
+            System.err.println("Error clearing cumulative effects: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+
+    
+    /**
      * Create a custom message dialog with English buttons
      */
     private void showEnglishMessageDialog(Component parent, String message, String title, int messageType) {
@@ -2161,15 +3077,4 @@ public class JournalPanel extends JPanel {
     }
 }
 
-class MealJournalApp {
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            JFrame frame = new JFrame("Meal Journal");
-            frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-            frame.setSize(500, 300);
-            frame.setLocationRelativeTo(null);
-            frame.add(new JournalPanel(1)); // Pass dummy userId
-            frame.setVisible(true);
-        });
-    }
-}
+

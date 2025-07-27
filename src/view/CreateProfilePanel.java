@@ -297,6 +297,9 @@ public class CreateProfilePanel extends JPanel {
     }
 
     private void saveProfile(ActionEvent e) {
+        // Disable save button to prevent multiple clicks
+        saveBtn.setEnabled(false);
+        
         try {
             String name = nameField.getText().trim();
             String sex = (String) sexBox.getSelectedItem();
@@ -324,8 +327,16 @@ public class CreateProfilePanel extends JPanel {
                 try {
                     profileController.createProfile(name, sex, selectedDate, height, weight);
                     savedToDatabase = true;
+                } catch (IllegalArgumentException nameEx) {
+                    // Handle duplicate name error
+                    JOptionPane.showMessageDialog(this, nameEx.getMessage(), "Duplicate Name", 
+                        JOptionPane.WARNING_MESSAGE);
+                    return; // Don't proceed with profile creation
                 } catch (Exception dbEx) {
                     System.err.println("Database save failed: " + dbEx.getMessage());
+                    JOptionPane.showMessageDialog(this, "Database save failed: " + dbEx.getMessage(), 
+                        "Database Error", JOptionPane.ERROR_MESSAGE);
+                    return; // Don't proceed with profile creation
                 }
             }
             
@@ -363,6 +374,9 @@ public class CreateProfilePanel extends JPanel {
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, "Error creating profile: " + ex.getMessage(), 
                 "Error", JOptionPane.ERROR_MESSAGE);
+        } finally {
+            // Re-enable save button
+            saveBtn.setEnabled(true);
         }
     }
 }

@@ -21,6 +21,9 @@ public class SwapService {
     private SwapStatusDAO swapStatusDAO;
     private Map<Integer, FoodItem> foodDatabase;
     
+    // Simple hardcoded max user ID for now
+    private static final int MAX_USER_ID = 1000;
+    
     public SwapService() {
         this.swapEngine = new SwapEngine();
         this.mealDAO = new MealDAO();
@@ -234,8 +237,11 @@ public class SwapService {
             
             LocalDate localDate = LocalDate.parse(date);
             
-            // Try to find swapped meals for different user IDs (since we don't know the exact user ID)
-            for (int userId = 1; userId <= 10; userId++) { // Try user IDs 1-10
+            // Use hardcoded max user ID for simplicity
+            System.out.println("DEBUG: Searching for rollback data in user range 1-" + MAX_USER_ID);
+            
+            // Try to find swapped meals for different user IDs
+            for (int userId = 1; userId <= MAX_USER_ID; userId++) {
                 List<Integer> swappedMealIds = swapStatusDAO.getSwappedMealIds(userId, localDate);
                 if (!swappedMealIds.isEmpty()) {
                     System.out.println("Found swapped meals for user " + userId + " on date " + date);
@@ -248,13 +254,15 @@ public class SwapService {
                 }
             }
             
-            System.out.println("No swapped meals found for date " + date + " in any user");
+            System.out.println("No swapped meals found for date " + date + " in any user (searched up to user " + MAX_USER_ID + ")");
             
         } catch (Exception e) {
             System.err.println("Error getting rollback data: " + e.getMessage());
         }
         return null;
     }
+    
+
     
     /**
      * Restore original meal from rollback data
@@ -407,13 +415,18 @@ public class SwapService {
      */
     public boolean hasMealBeenSwapped(int mealId, int userId) {
         try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, cannot check meal swap status");
+                return false;
+            }
+            
             Meal meal = getMealById(mealId, userId);
             if (meal == null) {
                 return false;
             }
             
-            // Check if rollback data exists for this meal's date
-            return hasMealsBeenSwapped(userId, meal.getDate());
+            // Check if this specific meal has been swapped using SwapStatusDAO
+            return swapStatusDAO.hasMealBeenSwapped(userId, mealId, meal.getDate());
         } catch (Exception e) {
             System.err.println("Error checking meal swap status: " + e.getMessage());
             return false;
@@ -446,15 +459,47 @@ public class SwapService {
         }
     }
     
+    /**
+     * Mark a meal as swapped with the given original meal data
+     * @param mealId The meal ID to mark as swapped
+     * @param userId The user ID
+     * @param date The date of the meal
+     * @param originalMealData The original meal data to store
+     */
+    public void markMealAsSwapped(int mealId, int userId, LocalDate date, String originalMealData) {
+        try {
+            if (swapStatusDAO == null) {
+                System.err.println("Warning: SwapStatusDAO not initialized, cannot mark meal as swapped");
+                return;
+            }
+            
+            boolean success = swapStatusDAO.markMealAsSwapped(userId, mealId, date, originalMealData);
+            if (success) {
+                System.out.println("DEBUG: Successfully marked meal " + mealId + " as swapped for user " + userId + " on date " + date);
+            } else {
+                System.err.println("Warning: Failed to mark meal " + mealId + " as swapped");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error marking meal as swapped: " + e.getMessage());
+        }
+    }
+    
     // Helper methods
     private Meal getMealById(int mealId, int userId) {
         try {
-            // Get all meals for the user and find the one with matching mealId
+            // First try to get the meal directly using MealDAO
+            Meal meal = mealDAO.getMealById(mealId);
+            if (meal != null) {
+                return meal;
+            }
+            
+            // If not found, try to get all meals for the user and find the one with matching mealId
             List<Meal> userMeals = mealDAO.getMealsByUserId(userId);
             if (userMeals != null) {
-                for (Meal meal : userMeals) {
-                    if (meal.getMealID() == mealId) {
-                        return meal;
+                for (Meal userMeal : userMeals) {
+                    if (userMeal.getMealID() == mealId) {
+                        return userMeal;
                     }
                 }
             }
@@ -622,6 +667,8 @@ public class SwapService {
         }
         return null;
     }
+    
+
     
     // Inner classes for data structures
     public static class NutrientChange {

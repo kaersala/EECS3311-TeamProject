@@ -628,5 +628,41 @@ public class MySQLAdapter implements DatabaseAdapter {
         }
         return nutrients;
     }
+    
+    /**
+     * Get the maximum user ID from the database
+     * This allows dynamic detection of user ID range
+     */
+    public int getMaxUserId() {
+        try {
+            // Create a new connection for this operation
+            Connection conn = connect();
+            if (conn == null) {
+                System.err.println("Failed to create database connection for getting max user ID");
+                return 20; // Fallback default
+            }
+            
+            try {
+                String query = "SELECT MAX(UserID) as max_user_id FROM user_profile";
+                try (PreparedStatement stmt = conn.prepareStatement(query)) {
+                    ResultSet rs = stmt.executeQuery();
+                    if (rs.next()) {
+                        int maxUserId = rs.getInt("max_user_id");
+                        System.out.println("DEBUG: Found max user ID: " + maxUserId);
+                        return maxUserId > 0 ? maxUserId : 20; // Return at least 20 if no users found
+                    }
+                }
+            } finally {
+                // Always close the connection
+                if (conn != null && !conn.isClosed()) {
+                    conn.close();
+                }
+            }
+        } catch (SQLException e) {
+            System.err.println("Error getting max user ID: " + e.getMessage());
+        }
+        
+        return 20; // Fallback default
+    }
 }
 
