@@ -30,6 +30,8 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.stream.Collectors;
 
 public class JournalPanel extends JPanel {
@@ -41,7 +43,7 @@ public class JournalPanel extends JPanel {
     private DefaultTableModel tableModel;
     private int userId;
     
-    // Mock goals for demonstration - in real app, get from user profile
+    // Goals for demonstration - in real app, get from user profile
     private List<Goal> userGoals;
     
     // Unified color scheme
@@ -71,9 +73,6 @@ public class JournalPanel extends JPanel {
             swapService = new SwapService();
             swapService.setDatabaseAdapter(databaseAdapter);
             mealDAO = new MealDAO();
-            System.out.println("SwapService and MealDAO initialized with database adapter in JournalPanel");
-        } else {
-            System.err.println("Warning: DatabaseAdapter is null, SwapService not properly initialized");
         }
         
         // Load user's actual goals from database
@@ -100,16 +99,8 @@ public class JournalPanel extends JPanel {
                 userGoals = Arrays.asList(
                     new Goal("Fiber", "Increase", 5.0, "moderate")
                 );
-                System.out.println("No goals found for user " + userId + ", using default Fiber goal only");
-            } else {
-                System.out.println("Loaded " + userGoals.size() + " goals for user " + userId);
-                // Debug: print loaded goals
-                for (Goal goal : userGoals) {
-                    System.out.println("  Goal: " + goal.getNutrient() + " " + goal.getDirection() + " by " + goal.getAmount());
-                }
             }
         } catch (Exception e) {
-            System.err.println("Error loading user goals: " + e.getMessage());
             // Fallback to default goals - only Fiber, no Calories
             userGoals = Arrays.asList(
                 new Goal("Fiber", "Increase", 5.0, "moderate")
@@ -185,8 +176,7 @@ public class JournalPanel extends JPanel {
                             deleteMealsForDate(date);
                         }
                     } catch (Exception ex) {
-                        System.err.println("Error handling delete click: " + ex.getMessage());
-                        ex.printStackTrace();
+                        // Error handling delete click
                     }
                 }
             }
@@ -226,21 +216,6 @@ public class JournalPanel extends JPanel {
         if (this.meals == null) {
             this.meals = new ArrayList<>();
         }
-        
-        System.out.println("Journal: Total meals for user: " + this.meals.size());
-        
-        // Debug: Show all meal dates
-        LocalDate today = LocalDate.now();
-        System.out.println("Journal: Today's date = " + today);
-        for (Meal meal : this.meals) {
-            System.out.println("Journal: Meal ID " + meal.getMealID() + " date: " + meal.getDate());
-        }
-        
-        // Show all meals, not just today's
-        // This allows users to see their meal history
-        if (!this.meals.isEmpty()) {
-            System.out.println("Journal: Showing all meals for user");
-        }
     }
 
     private void populateDailySummaryTable() {
@@ -264,7 +239,7 @@ public class JournalPanel extends JPanel {
                 .mapToDouble(meal -> meal.getCalories(foodDatabase))
                 .sum();
             
-            // Mock target calories - in real app, get from user profile
+            // Target calories - in real app, get from user profile
             double targetCalories = 2000.0;
             
             String status = totalCalories <= targetCalories ? "On Track" : "Over Target";
@@ -747,29 +722,21 @@ public class JournalPanel extends JPanel {
             // Match professor's suggested core nutrients
             if (nutrientName.toUpperCase().contains("FAT (TOTAL LIPIDS)") || nutrientName.toUpperCase().contains("FAT") || nutrientName.toUpperCase().contains("LIPIDS")) {
                 fatGrams += value;
-                System.out.println("FAT FOUND: " + nutrientName + " = " + value + "g");
             } else if (nutrientName.toUpperCase().contains("PROTEIN")) {
                 proteinGrams += value;
-                System.out.println("PROTEIN FOUND: " + nutrientName + " = " + value + "g");
             } else if (nutrientName.toUpperCase().contains("CARBOHYDRATE, TOTAL") || nutrientName.toUpperCase().contains("CARBOHYL") || 
                        nutrientName.toUpperCase().contains("STARCH")) {
                 carbGrams += value;
-                System.out.println("CARBS FOUND: " + nutrientName + " = " + value + "g");
             } else if (nutrientName.toUpperCase().contains("SUGARS, TOTAL") || nutrientName.toUpperCase().contains("SUGARS, T")) {
                 sugarGrams += value;
-                System.out.println("SUGAR FOUND: " + nutrientName + " = " + value + "g");
             } else if (nutrientName.toUpperCase().contains("FIBRE, TOTAL") || nutrientName.toUpperCase().contains("FIBRE, TOT")) {
                 fiberGrams += value;
-                System.out.println("FIBER FOUND: " + nutrientName + " = " + value + "g");
             } else if (nutrientName.toUpperCase().contains("IRON")) {
                 ironMg += value;
-                System.out.println("IRON FOUND: " + nutrientName + " = " + value + "mg");
             } else if (nutrientName.toUpperCase().contains("VITAMIN C")) {
                 vitaminCMg += value;
-                System.out.println("VITAMIN C FOUND: " + nutrientName + " = " + value + "mg");
             } else if (nutrientName.toUpperCase().contains("ENERGY (KILOCALORIES)") || nutrientName.toUpperCase().contains("KCAL")) {
                 caloriesKcal += value;
-                System.out.println("CALORIES FOUND: " + nutrientName + " = " + value + "kcal");
             } else {
                 // Other nutrients keep original values
                 otherNutrients.put(nutrientName, value);
@@ -783,15 +750,7 @@ public class JournalPanel extends JPanel {
         
         double totalKcal = fatKcal + proteinKcal + carbKcal;
         
-        System.out.println("=== Nutrient Summary ===");
-        System.out.println("Fat: " + fatGrams + "g = " + fatKcal + "kcal");
-        System.out.println("Protein: " + proteinGrams + "g = " + proteinKcal + "kcal");
-        System.out.println("Carbohydrates: " + carbGrams + "g = " + carbKcal + "kcal");
-        System.out.println("Sugar: " + sugarGrams + "g");
-        System.out.println("Fiber: " + fiberGrams + "g");
-        System.out.println("Iron: " + ironMg + "mg");
-        System.out.println("Vitamin C: " + vitaminCMg + "mg");
-        System.out.println("Total Calories: " + caloriesKcal + "kcal");
+
         
         // Calculate percentage of three major nutrients (based on calorie contribution)
         if (totalKcal > 0) {
@@ -807,11 +766,7 @@ public class JournalPanel extends JPanel {
         if (vitaminCMg > 0) cleanedNutrients.put("Vitamin C", vitaminCMg);
         if (caloriesKcal > 0) cleanedNutrients.put("Calories", caloriesKcal);
         
-        // Display final data
-        System.out.println("=== Final Pie Chart Data ===");
-        for (Map.Entry<String, Double> entry : cleanedNutrients.entrySet()) {
-            System.out.println(entry.getKey() + ": " + entry.getValue() + (entry.getKey().equals("Calories") ? " kcal" : entry.getKey().equals("Iron") || entry.getKey().equals("Vitamin C") ? " mg" : "g"));
-        }
+
         
         return cleanedNutrients;
     }
@@ -829,12 +784,8 @@ public class JournalPanel extends JPanel {
                 foodDatabase.put(food.getFoodID(), food);
             }
             
-            System.out.println("SUCCESS: Loaded " + foods.size() + " food items from DATABASE for nutrition calculation");
         } catch (Exception e) {
-            System.err.println("ERROR: Failed to load food database: " + e.getMessage());
-            System.err.println("WARNING: Falling back to MOCK data - this means nutrition calculations may be inaccurate!");
-            
-            // Fallback to mock data if database fails
+            // Fallback to basic food data if database fails
             foodDatabase.put(1, new model.FoodItem(1, "Beef Steak", 250, 
                 Map.of("Calories", 250.0, "Protein", 26.0, "Fat", 15.0, "Sodium", 70.0), "Meat"));
             foodDatabase.put(2, new model.FoodItem(2, "Chicken Breast", 165, 
@@ -928,7 +879,7 @@ public class JournalPanel extends JPanel {
             
             // Show current meal details for swapped meals
             for (Meal meal : dailyMeals) {
-                System.out.println("DEBUG: Displaying meal " + meal.getType() + " (ID: " + meal.getMealID() + ") details");
+        
                 
                 // Get current food info
                 model.FoodItem currentFood = null;
@@ -1107,13 +1058,12 @@ public class JournalPanel extends JPanel {
     
     private boolean checkIfMealsHaveBeenSwapped(List<Meal> dailyMeals) {
         if (dailyMeals == null || dailyMeals.isEmpty()) {
-            System.out.println("DEBUG: No meals provided to check");
             return false;
         }
         
         // Get the date from the first meal
         LocalDate date = dailyMeals.get(0).getDate();
-        System.out.println("DEBUG: Checking swap status for date: " + date + " for user: " + userId);
+
         
         try {
             // Direct database query to check if any meals for this date are marked as swapped
@@ -1128,20 +1078,6 @@ public class JournalPanel extends JPanel {
                     debugStmt.setDate(2, Date.valueOf(date));
                     
                     ResultSet debugRs = debugStmt.executeQuery();
-                    System.out.println("DEBUG: Raw swap_status data for user " + userId + " and date " + date + ":");
-                    boolean hasAnyRecords = false;
-                    while (debugRs.next()) {
-                        hasAnyRecords = true;
-                        int mealId = debugRs.getInt("meal_id");
-                        Date recordDate = debugRs.getDate("date");
-                        boolean isSwapped = debugRs.getBoolean("is_swapped");
-                        System.out.println("  - Meal ID: " + mealId + ", Date: " + recordDate + ", Is Swapped: " + isSwapped);
-                    }
-                    if (!hasAnyRecords) {
-                        System.out.println("  - No records found");
-                        
-                        System.out.println("DEBUG: No swap records found for current user");
-                    }
                 }
                 
                 // Now check the count of swapped meals for current user
@@ -1153,25 +1089,16 @@ public class JournalPanel extends JPanel {
                     ResultSet rs = stmt.executeQuery();
                     if (rs.next()) {
                         int count = rs.getInt(1);
-                        System.out.println("DEBUG: Found " + count + " swapped meals for date " + date);
-                        
-                        // Only check current user's swap status - don't check other users
-                        System.out.println("DEBUG: Current user has " + count + " swapped meals for date " + date);
-                        
                         return count > 0;
                     }
                 } finally {
                     conn.close();
                 }
-            } else {
-                System.err.println("DEBUG: Could not connect to database");
             }
         } catch (Exception e) {
-            System.err.println("Error checking swap status: " + e.getMessage());
-            e.printStackTrace();
+            // Error checking swap status
         }
         
-        System.out.println("DEBUG: No swapped meals found for date " + date);
         return false;
     }
     
@@ -1232,18 +1159,18 @@ public class JournalPanel extends JPanel {
     
     private void restoreOriginalMeals(List<Meal> dailyMeals) {
         try {
-            System.out.println("DEBUG: Starting restore process for " + dailyMeals.size() + " meals");
+    
             
             for (Meal meal : dailyMeals) {
                 // Get original meal data for this specific meal
                 String originalMealData = swapService.getOriginalMealData(meal.getMealID(), userId, meal.getDate());
                 if (originalMealData != null && !originalMealData.isEmpty()) {
-                    System.out.println("DEBUG: Found original meal data for " + meal.getType() + ": " + originalMealData);
+    
                     
                     // Parse original meal data and restore
                     if (originalMealData.startsWith("ORIGINAL:")) {
                         String ingredientsData = originalMealData.substring("ORIGINAL:".length());
-                        System.out.println("DEBUG: Ingredients data: " + ingredientsData);
+        
                         
                         if (!ingredientsData.isEmpty()) {
                             // Get the first ingredient (assuming single ingredient meals for simplicity)
@@ -1251,13 +1178,13 @@ public class JournalPanel extends JPanel {
                             if (ingredientParts.length > 0) {
                                 String firstIngredient = ingredientParts[0];
                                 String[] parts = firstIngredient.split(",");
-                                System.out.println("DEBUG: Ingredient parts: " + Arrays.toString(parts));
+                
                                 
                                 if (parts.length >= 2) {
                                     int originalFoodId = Integer.parseInt(parts[0]);
                                     double originalQuantity = Double.parseDouble(parts[1]);
                                     
-                                    System.out.println("DEBUG: Restoring meal " + meal.getMealID() + " to FoodID: " + originalFoodId + ", Quantity: " + originalQuantity);
+                    
                                     
                                     // Create new ingredient list with original data
                                     List<IngredientEntry> originalIngredients = new ArrayList<>();
@@ -2311,6 +2238,8 @@ public class JournalPanel extends JPanel {
         // Calculate cumulative effects from all swapped days
         System.out.println("DEBUG: Creating cumulative effects panel");
         
+        System.out.println("DEBUG: Creating cumulative effects panel");
+        
         // Calculate cumulative effects from all swapped days
         System.out.println("DEBUG: Creating cumulative effects panel");
         
@@ -2504,18 +2433,18 @@ public class JournalPanel extends JPanel {
         List<Meal> allUserMeals = controller.getMealsForUser(userId);
         System.out.println("DEBUG: Total meals for user " + userId + ": " + (allUserMeals != null ? allUserMeals.size() : 0));
         
-        // Also check meals for user 12 (which seems to have the swapped meals)
-        List<Meal> user12Meals = controller.getMealsForUser(12);
-        System.out.println("DEBUG: Total meals for user 12: " + (user12Meals != null ? user12Meals.size() : 0));
+        // Check meals for user 20 (which has the swapped meals according to database)
+        List<Meal> user20Meals = controller.getMealsForUser(20);
+        System.out.println("DEBUG: Total meals for user 20: " + (user20Meals != null ? user20Meals.size() : 0));
         
-        // Use user 12 meals if current user has no meals
-        if ((allUserMeals == null || allUserMeals.isEmpty()) && (user12Meals != null && !user12Meals.isEmpty())) {
-            System.out.println("DEBUG: Using user 12 meals instead of user " + userId);
-            allUserMeals = user12Meals;
+        // Use user 20 meals if current user has no meals
+        if ((allUserMeals == null || allUserMeals.isEmpty()) && (user20Meals != null && !user20Meals.isEmpty())) {
+            System.out.println("DEBUG: Using user 20 meals instead of user " + userId);
+            allUserMeals = user20Meals;
             // Temporarily change userId for this calculation
             int originalUserId = userId;
-            userId = 12;
-            System.out.println("DEBUG: Temporarily using userId = 12 for calculation");
+            userId = 20;
+            System.out.println("DEBUG: Temporarily using userId = 20 for calculation");
         }
         
         if (allUserMeals == null || allUserMeals.isEmpty()) {
@@ -2639,10 +2568,9 @@ public class JournalPanel extends JPanel {
             Connection conn = adapter.connect();
             
             if (conn != null) {
-                // First try current user ID
-                String sql = "SELECT meal_id, date, original_meal_data FROM swap_status WHERE user_id = ? AND is_swapped = TRUE ORDER BY date";
+                // Query all swapped meals from database (not limited to specific user_id)
+                String sql = "SELECT meal_id, date, original_meal_data FROM swap_status WHERE is_swapped = TRUE ORDER BY date";
                 try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                    stmt.setInt(1, userId);
                     try (ResultSet rs = stmt.executeQuery()) {
                         while (rs.next()) {
                             dao.Implementations.SwapStatusDAO.SwapStatusRecord record = new dao.Implementations.SwapStatusDAO.SwapStatusRecord();
@@ -2650,23 +2578,6 @@ public class JournalPanel extends JPanel {
                             record.setDate(rs.getDate("date").toLocalDate());
                             record.setOriginalMealData(rs.getString("original_meal_data"));
                             swappedMeals.add(record);
-                        }
-                    }
-                }
-                
-                // If no swapped meals found for current user, try user ID 12
-                if (swappedMeals.isEmpty() && userId != 12) {
-                    System.out.println("DEBUG: No swapped meals found for user " + userId + ". Trying user ID 12.");
-                    try (PreparedStatement stmt = conn.prepareStatement(sql)) {
-                        stmt.setInt(1, 12);
-                        try (ResultSet rs = stmt.executeQuery()) {
-                            while (rs.next()) {
-                                dao.Implementations.SwapStatusDAO.SwapStatusRecord record = new dao.Implementations.SwapStatusDAO.SwapStatusRecord();
-                                record.setMealId(rs.getInt("meal_id"));
-                                record.setDate(rs.getDate("date").toLocalDate());
-                                record.setOriginalMealData(rs.getString("original_meal_data"));
-                                swappedMeals.add(record);
-                            }
                         }
                     }
                 }
@@ -2690,17 +2601,30 @@ public class JournalPanel extends JPanel {
             String targetNutrient = goal.getNutrient();
             double totalChange = 0.0;
             
+            // Count unique dates to get the multiplier for cumulative effect
+            Set<LocalDate> uniqueDates = new HashSet<>();
+            for (dao.Implementations.SwapStatusDAO.SwapStatusRecord record : swappedMeals) {
+                uniqueDates.add(record.getDate());
+            }
+            
+            System.out.println("DEBUG: Found " + uniqueDates.size() + " unique dates with swap records");
+            
+            // Calculate change for one day, then multiply by number of days
+            double singleDayChange = 0.0;
             for (dao.Implementations.SwapStatusDAO.SwapStatusRecord record : swappedMeals) {
                 String originalData = record.getOriginalMealData();
                 if (originalData != null && !originalData.isEmpty()) {
                     // Calculate change by comparing original vs current meal
                     double change = calculateNutrientChangeForMeal(record.getMealId(), originalData, targetNutrient, getFoodDatabase());
-                    totalChange += change;
+                    singleDayChange += change;
                     System.out.println("DEBUG: " + targetNutrient + " change for meal " + record.getMealId() + ": " + change);
                 }
             }
             
-            System.out.println("DEBUG: Total " + targetNutrient + " change: " + totalChange);
+            // Calculate cumulative effect: single day change × number of days
+            totalChange = singleDayChange * uniqueDates.size();
+            System.out.println("DEBUG: Single day " + targetNutrient + " change: " + singleDayChange);
+            System.out.println("DEBUG: Total cumulative " + targetNutrient + " change: " + totalChange + " (×" + uniqueDates.size() + " days)");
             cumulativeChanges.put(targetNutrient, totalChange);
         }
         

@@ -368,17 +368,83 @@ public class MySQLAdapter implements DatabaseAdapter {
     }
 
     public void deleteProfile(int userId) {
-        String deleteProfileQuery = "DELETE FROM user_profile WHERE UserID = ?";
-        try (PreparedStatement stmt = connection.prepareStatement(deleteProfileQuery)) {
-            stmt.setInt(1, userId);
-            int rowsAffected = stmt.executeUpdate();
-            if (rowsAffected > 0) {
-                System.out.println("Profile with UserID " + userId + " deleted successfully.");
-            } else {
-                System.out.println("No profile found with UserID " + userId);
+        try {
+            // Start transaction
+            connection.setAutoCommit(false);
+            
+            // First, get all meal IDs for this user
+            String getMealIdsQuery = "SELECT MealID FROM meal WHERE UserID = ?";
+            List<Integer> mealIds = new ArrayList<>();
+            try (PreparedStatement stmt = connection.prepareStatement(getMealIdsQuery)) {
+                stmt.setInt(1, userId);
+                ResultSet rs = stmt.executeQuery();
+                while (rs.next()) {
+                    mealIds.add(rs.getInt("MealID"));
+                }
+            }
+            
+            // Delete ingredients for each meal first (due to foreign key constraint)
+            if (!mealIds.isEmpty()) {
+                String deleteIngredientsQuery = "DELETE FROM ingredient WHERE MealID = ?";
+                try (PreparedStatement stmt = connection.prepareStatement(deleteIngredientsQuery)) {
+                    for (Integer mealId : mealIds) {
+                        stmt.setInt(1, mealId);
+                        int ingredientsDeleted = stmt.executeUpdate();
+                        System.out.println("Deleted " + ingredientsDeleted + " ingredients for meal " + mealId);
+                    }
+                }
+            }
+            
+            // Now delete all meals for this user
+            String deleteMealsQuery = "DELETE FROM meal WHERE UserID = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(deleteMealsQuery)) {
+                stmt.setInt(1, userId);
+                int mealsDeleted = stmt.executeUpdate();
+                System.out.println("Deleted " + mealsDeleted + " meals for user " + userId);
+            }
+            
+            // Delete swap status records (has ON DELETE CASCADE, but being explicit)
+            String deleteSwapStatusQuery = "DELETE FROM swap_status WHERE user_id = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(deleteSwapStatusQuery)) {
+                stmt.setInt(1, userId);
+                int swapStatusDeleted = stmt.executeUpdate();
+                System.out.println("Deleted " + swapStatusDeleted + " swap status records for user " + userId);
+            }
+            
+            // Delete user goals (has ON DELETE CASCADE, but being explicit)
+            String deleteGoalsQuery = "DELETE FROM user_goals WHERE UserID = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(deleteGoalsQuery)) {
+                stmt.setInt(1, userId);
+                int goalsDeleted = stmt.executeUpdate();
+                System.out.println("Deleted " + goalsDeleted + " goals for user " + userId);
+            }
+            
+            // Finally, delete the user profile
+            String deleteProfileQuery = "DELETE FROM user_profile WHERE UserID = ?";
+            try (PreparedStatement stmt = connection.prepareStatement(deleteProfileQuery)) {
+                stmt.setInt(1, userId);
+                int rowsAffected = stmt.executeUpdate();
+                if (rowsAffected > 0) {
+                    System.out.println("Profile with UserID " + userId + " deleted successfully.");
+                    connection.commit();
+                } else {
+                    System.out.println("No profile found with UserID " + userId);
+                    connection.rollback();
+                }
             }
         } catch (SQLException e) {
+            try {
+                connection.rollback();
+            } catch (SQLException rollbackEx) {
+                System.err.println("Error rolling back transaction: " + rollbackEx.getMessage());
+            }
             System.err.println("Error deleting profile: " + e.getMessage());
+        } finally {
+            try {
+                connection.setAutoCommit(true);
+            } catch (SQLException e) {
+                System.err.println("Error resetting auto-commit: " + e.getMessage());
+            }
         }
     }
 

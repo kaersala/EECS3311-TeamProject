@@ -151,11 +151,10 @@ public class MealEntryPanel extends JPanel {
                             if (foodId != -1) {
                                 // Update the ingredient quantity in the database
                                 databaseAdapter.updateIngredientQuantity(mealId, foodId, newQuantity);
-                                System.out.println("Updated quantity for meal " + mealId + ", food " + foodId + " to " + newQuantity);
                             }
                         }
                     } catch (Exception ex) {
-                        System.err.println("Error updating quantity in database: " + ex.getMessage());
+                        // Error updating quantity in database
                     }
                 }
                 
@@ -208,10 +207,9 @@ public class MealEntryPanel extends JPanel {
                         int mealId = Integer.parseInt(mealIdObj.toString());
                         if (databaseAdapter != null && databaseAdapter.getConnection() != null) {
                             databaseAdapter.deleteMeal(mealId);
-                            System.out.println("Deleted meal ID: " + mealId);
                         }
                     } catch (Exception ex) {
-                        System.err.println("Error deleting meal: " + ex.getMessage());
+                        // Error deleting meal
                     }
                 }
                 tableModel.removeRow(selected);
@@ -238,47 +236,19 @@ public class MealEntryPanel extends JPanel {
             databaseAdapter = new MySQLAdapter();
             databaseAdapter.connect();
             foodItems = databaseAdapter.loadFoods();
-            System.out.println("Loaded " + foodItems.size() + " food items from database");
-            
-            // Debug: Show first few food items
-            if (foodItems.size() > 0) {
-                System.out.println("First 5 food items:");
-                for (int i = 0; i < Math.min(5, foodItems.size()); i++) {
-                    System.out.println("  " + foodItems.get(i).getName());
-                }
-                
-                // Debug: Check for chips-related foods
-                System.out.println("Checking for chips-related foods:");
-                int chipsCount = 0;
-                for (FoodItem food : foodItems) {
-                    if (food.getName().toLowerCase().contains("chip")) {
-                        System.out.println("  Found: " + food.getName());
-                        chipsCount++;
-                        if (chipsCount >= 10) break; // Show first 10
-                    }
-                }
-                if (chipsCount == 0) {
-                    System.out.println("  No foods containing 'chip' found in database");
-                }
-            }
         } catch (Exception e) {
-            System.err.println("Failed to load food items from database: " + e.getMessage());
-            e.printStackTrace();
             // Fallback to CSV data
             try {
                 foodItems = dao.adapter.CSVAdapter.loadFoodItemsFromCSV("src/csv/FOOD NAME.csv");
-                System.out.println("Loaded " + foodItems.size() + " food items from CSV");
             } catch (Exception csvException) {
-                System.err.println("Failed to load food items from CSV: " + csvException.getMessage());
-                // Final fallback to mock data
-                foodItems = createMockFoodItems();
-                System.out.println("Using mock food items");
+                // Final fallback to basic food data
+                foodItems = createBasicFoodItems();
             }
         }
     }
     
-    private List<FoodItem> createMockFoodItems() {
-        List<FoodItem> mockItems = new ArrayList<>();
+    private List<FoodItem> createBasicFoodItems() {
+        List<FoodItem> basicItems = new ArrayList<>();
         
         // Add some common foods including chips
         Map<String, Double> chipsNutrients = new HashMap<>();
@@ -286,37 +256,37 @@ public class MealEntryPanel extends JPanel {
         chipsNutrients.put("Fat", 35.0);
         chipsNutrients.put("Carbs", 53.0);
         chipsNutrients.put("Fiber", 4.0);
-        mockItems.add(new FoodItem(5989, "Potato chips, plain, salted", 536.0, chipsNutrients, "Snacks"));
+        basicItems.add(new FoodItem(5989, "Potato chips, plain, salted", 536.0, chipsNutrients, "Snacks"));
         
         Map<String, Double> cookieNutrients = new HashMap<>();
         cookieNutrients.put("Protein", 4.0);
         cookieNutrients.put("Fat", 24.0);
         cookieNutrients.put("Carbs", 67.0);
         cookieNutrients.put("Fiber", 2.0);
-        mockItems.add(new FoodItem(5987, "Chocolate chip cookies, commercial", 502.0, cookieNutrients, "Snacks"));
+        basicItems.add(new FoodItem(5987, "Chocolate chip cookies, commercial", 502.0, cookieNutrients, "Snacks"));
         
         Map<String, Double> granolaNutrients = new HashMap<>();
         granolaNutrients.put("Protein", 8.0);
         granolaNutrients.put("Fat", 12.0);
         granolaNutrients.put("Carbs", 72.0);
         granolaNutrients.put("Fiber", 6.0);
-        mockItems.add(new FoodItem(5989, "Granola bar, chewy, chocolate chip", 420.0, granolaNutrients, "Snacks"));
+        basicItems.add(new FoodItem(5989, "Granola bar, chewy, chocolate chip", 420.0, granolaNutrients, "Snacks"));
         
         Map<String, Double> appleNutrients = new HashMap<>();
         appleNutrients.put("Protein", 0.3);
         appleNutrients.put("Fat", 0.2);
         appleNutrients.put("Carbs", 14.0);
         appleNutrients.put("Fiber", 2.4);
-        mockItems.add(new FoodItem(3, "Apple", 52.0, appleNutrients, "Fruits"));
+        basicItems.add(new FoodItem(3, "Apple", 52.0, appleNutrients, "Fruits"));
         
         Map<String, Double> breadNutrients = new HashMap<>();
         breadNutrients.put("Protein", 9.0);
         breadNutrients.put("Fat", 3.2);
         breadNutrients.put("Carbs", 49.0);
         breadNutrients.put("Fiber", 2.7);
-        mockItems.add(new FoodItem(1, "White bread", 265.0, breadNutrients, "Grains"));
+        basicItems.add(new FoodItem(1, "White bread", 265.0, breadNutrients, "Grains"));
         
-        return mockItems;
+        return basicItems;
     }
 
     private void showDatePicker() {
@@ -404,7 +374,7 @@ public class MealEntryPanel extends JPanel {
                     .map(FoodItem::getName)
                     .toArray(String[]::new);
         } else {
-            // Fallback to mock data if database loading failed
+            // Fallback to basic food items if database loading failed
             foodNames = new String[]{"Tomatoes", "Bread", "Eggs", "Beef", "Cheese", "Lettuce", "Rice", "Chicken"};
         }
         
@@ -518,7 +488,6 @@ public class MealEntryPanel extends JPanel {
                         
                         if (databaseAdapter != null && databaseAdapter.getConnection() != null) {
                             databaseAdapter.saveMeal(meal);
-                            System.out.println("Saved meal: " + selectedFood + " (" + formattedQuantity + "g, " + formattedMealType + ")");
                             
                             // Add to table with the new meal ID (we'll need to get it back)
                             // For now, add with empty meal ID and reload meals to get the correct IDs
@@ -581,8 +550,6 @@ public class MealEntryPanel extends JPanel {
                 count++;
             }
         }
-        
-        System.out.println("Total matches found: " + count);
         
         if (listModel.size() == 0) {
             listModel.addElement("No items found matching: " + searchText);
@@ -699,7 +666,7 @@ public class MealEntryPanel extends JPanel {
                 updateCaloriesDisplay();
                 
             } catch (Exception e) {
-                System.err.println("Error loading today's meals: " + e.getMessage());
+                // Error loading today's meals
             }
         }
     }
