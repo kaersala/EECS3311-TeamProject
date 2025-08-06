@@ -1,14 +1,13 @@
 package chart;
 
-public class InteractiveChartDecorator extends ChartDecorator {
+public class InteractiveChartDecorator extends AbstractChartDecorator {
 
     public InteractiveChartDecorator(Chart chart) {
         super(chart);
     }
 
     @Override
-    public void render() {
+    protected void addDecoration() {
         System.out.println("🖱️ Interactive features activated");
-        super.render();
     }
 }

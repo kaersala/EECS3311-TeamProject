@@ -1,14 +1,13 @@
 package chart;
 
-public class TooltopDecorator extends ChartDecorator {
+public class TooltopDecorator extends AbstractChartDecorator {
 
     public TooltopDecorator(Chart chart) {
         super(chart);
     }
 
     @Override
-    public void render() {
+    protected void addDecoration() {
         System.out.println("🛈 Tooltop enabled");
-        super.render();
     }
 }

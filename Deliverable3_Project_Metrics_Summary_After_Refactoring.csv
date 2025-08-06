@@ -1,0 +1,49 @@
+Level,Name,CLOC,CCC,WMC,RFC,ATFD,LCOM,CBO,DIT,Status,Notes
+Package,app,611,39,54,116,17,0,25,1,CRITICAL,Main class has high complexity
+Package,backend,188,80,95,92,7,0,15,1,CRITICAL,SwapEngine is the most complex class
+Package,chart,187,27,64,51,2,0,3,2,Good,Well-structured chart components
+Package,controller,133,30,91,68,5,0,11,1,Warning,UserProfileController has moderate complexity
+Package,dao,0,0,0,0,0,1,0,0,Good,Interface package
+Package,dao.Implementations,696,9,554,423,7,0,6,1,CRITICAL,GoalDAO and SwapStatusDAO are complex
+Package,dao.adapter,754,7,660,490,11,0,16,1,CRITICAL,MySQLAdapter is extremely complex (639 CLOC)
+Package,dao.interfaces,0,0,0,0,10,0,0,0,Good,Interface definitions
+Package,model,203,26,353,82,32,0,4,1,Warning,FoodItem has moderate complexity
+Package,model.meal,79,38,142,31,25,0,2,1,Good,Well-structured meal components
+Package,model.user,43,44,136,28,15,0,3,1,Good,User components are well-designed
+Package,service,970,4,2130,575,8,0,19,1,CRITICAL,SwapService is extremely complex (548 CLOC)
+Package,strategy,84,36,230,51,1,0,7,1,Good,Strategy pattern well implemented
+Package,view,3843,0,9691,2806,3,0,22,5,CRITICAL,JournalPanel is the most complex class (2395 CLOC)
+Class,app.Main,512,39,54,116,17,1,25,1,CRITICAL,Main application class with high coupling
+Class,backend.SwapEngine,121,21,34,46,7,1,15,1,Warning,Refactored - improved from previous version
+Class,dao.adapter.MySQLAdapter,639,90,106,86,8,1,16,1,CRITICAL,Database adapter with high complexity
+Class,dao.Implementations.GoalDAO,172,27,35,48,3,2,6,1,Warning,Goal management with moderate complexity
+Class,dao.Implementations.SwapStatusDAO,255,37,46,37,0,1,4,1,Warning,Swap tracking with moderate complexity
+Class,model.FoodItem,71,1,21,18,0,4,26,1,Good,Well-designed model class
+Class,service.SwapService,548,80,95,92,0,1,15,1,CRITICAL,Core swap logic with high complexity
+Class,view.JournalPanel,2395,352,484,279,16,2,22,5,CRITICAL,God Class - needs further refactoring
+Class,view.MealEntryPanel,545,59,75,146,16,2,11,5,CRITICAL,Meal entry with high complexity
+Class,view.CreateProfilePanel,302,23,30,67,5,1,5,5,Warning,Profile creation with moderate complexity
+Class,view.EditProfilePanel,238,21,25,70,9,1,3,5,Warning,Profile editing with moderate complexity
+Class,view.GoalSelectionUI,202,11,17,59,8,1,2,5,Warning,Goal selection with moderate complexity
+Class,view.SplashScreenUI,113,5,9,45,7,1,5,6,Good,Well-designed splash screen
+Method,app.Main.main(String[]),10,1,1,1,0,0,0,0,Good,Simple main method
+Method,app.Main.showMainMenu(),44,5,18,0,2,0,0,0,Good,Menu display method
+Method,backend.SwapEngine.findBestSwapForGoal(),34,5,17,2,4,0,0,0,Good,Refactored - improved from previous version
+Method,backend.SwapEngine.calculateSwapScore(),6,0,7,4,0,0,0,0,Good,Refactored - improved from previous version
+Method,backend.SwapEngine.isNutrientBalanced(),14,2,9,1,2,0,0,0,Good,Refactored - improved from previous version
+Method,dao.adapter.MySQLAdapter.connect(),30,2,8,0,1,0,0,0,Good,Database connection method
+Method,dao.adapter.MySQLAdapter.loadFoods(),74,12,28,0,5,0,0,0,Warning,Food loading with moderate complexity
+Method,dao.adapter.MySQLAdapter.saveMeal(Meal),43,7,13,1,5,0,0,0,Warning,Meal saving with moderate complexity
+Method,service.SwapService.applySwapsToMeal(),27,2,9,0,2,0,0,0,Good,Swap application method
+Method,service.SwapService.generateSuggestionsForMeal(),12,1,4,0,1,0,0,0,Good,Suggestion generation method
+Method,view.JournalPanel.initializeComponents(),85,8,16,0,5,0,0,0,Warning,Component initialization with moderate complexity
+Method,view.JournalPanel.calculateDailyNutrients(),68,2,23,3,2,0,0,0,Warning,Nutrient calculation with moderate complexity
+Method,view.JournalPanel.createSwapSuggestionsPanel(),165,22,50,3,4,0,0,0,CRITICAL,Complex UI panel creation
+Method,view.JournalPanel.applyAllSuggestions(),96,17,28,6,5,0,0,0,Warning,Complex suggestion application
+Method,view.MealEntryPanel.MealEntryPanel(int),120,14,31,0,13,0,0,0,Warning,Constructor with moderate complexity
+Method,view.MealEntryPanel.showAddIngredientDialog(),127,10,49,0,11,0,0,0,CRITICAL,Complex dialog creation
+Method,view.MealEntryPanel.loadTodaysMeals(),55,8,22,3,7,0,0,0,Warning,Meal loading with moderate complexity
+Method,view.CreateProfilePanel.saveProfile(ActionEvent),72,11,25,0,10,0,0,0,Warning,Profile saving with moderate complexity
+Method,view.EditProfilePanel.saveProfile(ActionEvent),52,9,18,0,8,0,0,0,Good,Profile editing method
+Method,view.GoalSelectionUI.handleAddGoal(ActionEvent),48,5,14,1,4,0,0,0,Good,Goal handling method
+Method,view.SplashScreenUI.handleLoadProfile(ActionEvent),32,4,10,0,3,0,0,0,Good,Profile loading method 

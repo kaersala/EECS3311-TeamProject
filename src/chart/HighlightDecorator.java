@@ -1,14 +1,13 @@
 package chart;
 
-public class HighlightDecorator extends ChartDecorator {
+public class HighlightDecorator extends AbstractChartDecorator {
 
     public HighlightDecorator(Chart chart) {
         super(chart);
     }
 
     @Override
-    public void render() {
+    protected void addDecoration() {
         System.out.println("🌟 Highlighting top nutrients");
-        super.render();
     }
 }

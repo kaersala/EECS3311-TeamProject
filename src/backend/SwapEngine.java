@@ -3,6 +3,9 @@ package backend;
 import model.*;
 import model.meal.IngredientEntry;
 import strategy.*;
+import service.NutrientCalculator;
+import service.SwapReasonGenerator;
+import model.IntensityLevel;
 
 import java.util.*;
 
@@ -20,7 +23,7 @@ public class SwapEngine {
         }
 
         // Calculate total nutrients for current meal
-        Map<String, Double> currentNutrients = calculateMealNutrients(currentMeal, foodDatabase);
+        Map<String, Double> currentNutrients = NutrientCalculator.calculateMealNutrients(currentMeal, foodDatabase);
         
         // Generate suggestions for each goal, but limit total number
         for (Goal goal : goals) {
@@ -32,7 +35,8 @@ public class SwapEngine {
             if (strategy == null) continue;
 
             // Find best replacement for current goal
-            SwapSuggestion bestSuggestion = findBestSwapForGoal(goal, currentMeal, foodDatabase, currentNutrients, strategy);
+            GoalContext goalContext = new GoalContext(goal);
+            SwapSuggestion bestSuggestion = findBestSwapForGoal(goalContext, currentMeal, foodDatabase, currentNutrients, strategy);
             
             if (bestSuggestion != null) {
                 suggestions.add(bestSuggestion);
@@ -42,7 +46,7 @@ public class SwapEngine {
         return suggestions;
     }
 
-    private SwapSuggestion findBestSwapForGoal(Goal goal, List<IngredientEntry> currentMeal, 
+    private SwapSuggestion findBestSwapForGoal(GoalContext goalContext, List<IngredientEntry> currentMeal, 
                                               Map<Integer, FoodItem> foodDatabase, 
                                               Map<String, Double> currentNutrients,
                                               RecommendationStrategy strategy) {
@@ -63,18 +67,18 @@ public class SwapEngine {
                     .filter(item -> item != null && item.getFoodGroup() != null && 
                                    item.getFoodGroup().equals(original.getFoodGroup()))
                     .filter(item -> item.getFoodID() != original.getFoodID())
-                    .filter(item -> isBetterForGoal(item, original, goal))
+                    .filter(item -> isBetterForGoal(item, original, goalContext))
                     .toList();
 
             for (FoodItem candidate : candidates) {
                 // Check nutrient balance after replacement
-                if (isNutrientBalanced(original, candidate, currentNutrients, goal)) {
+                if (isNutrientBalanced(original, candidate, currentNutrients, goalContext)) {
                     // Calculate overall score for replacement
-                    double score = calculateSwapScore(original, candidate, goal, currentNutrients);
+                    double score = calculateSwapScore(original, candidate, goalContext, currentNutrients);
                     
                     if (score > bestScore) {
                         bestScore = score;
-                        String reason = generateReason(original, candidate, goal);
+                        String reason = SwapReasonGenerator.generateReason(original, candidate, goalContext);
                         bestSuggestion = new SwapSuggestion(entry, new IngredientEntry(candidate.getFoodID(), entry.getQuantity()), reason);
                     }
                 }
@@ -84,10 +88,11 @@ public class SwapEngine {
         return bestSuggestion;
     }
 
-    private boolean isNutrientBalanced(FoodItem original, FoodItem replacement, 
-                                     Map<String, Double> currentNutrients, Goal goal) {
-        // Check if other nutrients are within allowed range after replacement
-        String targetNutrient = goal.getNutrient().toLowerCase();
+
+
+        private boolean isNutrientBalanced(FoodItem original, FoodItem replacement, 
+                                      Map<String, Double> currentNutrients, GoalContext goalContext) {
+        String targetNutrient = goalContext.getTargetNutrient();
         
         for (Map.Entry<String, Double> nutrient : currentNutrients.entrySet()) {
             String nutrientName = nutrient.getKey().toLowerCase();
@@ -95,13 +100,7 @@ public class SwapEngine {
             // Skip target nutrient
             if (nutrientName.equals(targetNutrient)) continue;
             
-            double originalValue = getNutrientValue(original, nutrientName);
-            double replacementValue = getNutrientValue(replacement, nutrientName);
-            double difference = replacementValue - originalValue;
-            
-            // Check if change is within allowed range
-            double currentTotal = nutrient.getValue();
-            double changePercentage = Math.abs(difference) / currentTotal;
+            double changePercentage = calculateNutrientChange(original, replacement, nutrientName, nutrient.getValue());
             
             if (changePercentage > NUTRIENT_TOLERANCE) {
                 return false; // Change too large, unbalanced
@@ -111,126 +110,74 @@ public class SwapEngine {
         return true;
     }
 
-    private double calculateSwapScore(FoodItem original, FoodItem replacement, Goal goal, Map<String, Double> currentNutrients) {
-        String targetNutrient = goal.getNutrient().toLowerCase();
-        String direction = goal.getDirection().toLowerCase();
-        
-        double originalValue = getNutrientValue(original, targetNutrient);
-        double replacementValue = getNutrientValue(replacement, targetNutrient);
+    private double calculateNutrientChange(FoodItem original, FoodItem replacement, 
+                                         String nutrientName, double currentTotal) {
+        double originalValue = original.getNutrientValue(nutrientName);
+        double replacementValue = replacement.getNutrientValue(nutrientName);
         double difference = replacementValue - originalValue;
         
-        // Base score: improvement degree of target nutrient
-        double baseScore = direction.equals("increase") ? difference : -difference;
+        return Math.abs(difference) / currentTotal;
+    }
+
+    private double calculateSwapScore(FoodItem original, FoodItem replacement, GoalContext goalContext, Map<String, Double> currentNutrients) {
+        double baseScore = calculateBaseScore(original, replacement, goalContext);
+        double targetBonus = calculateTargetBonus(original, replacement, goalContext, currentNutrients);
+        double groupBonus = calculateGroupBonus(original, replacement);
         
-        // Check if target amount is reached
-        double targetAmount = goal.getAmount();
-        double currentTotal = currentNutrients.getOrDefault(targetNutrient, 0.0);
+        return baseScore + targetBonus + groupBonus;
+    }
+
+    private double calculateBaseScore(FoodItem original, FoodItem replacement, GoalContext goalContext) {
+        double originalValue = original.getNutrientValue(goalContext.getTargetNutrient());
+        double replacementValue = replacement.getNutrientValue(goalContext.getTargetNutrient());
+        double difference = replacementValue - originalValue;
+        
+        return goalContext.getDirection().equals("increase") ? difference : -difference;
+    }
+
+    private double calculateTargetBonus(FoodItem original, FoodItem replacement, GoalContext goalContext, Map<String, Double> currentNutrients) {
+        double originalValue = original.getNutrientValue(goalContext.getTargetNutrient());
+        double replacementValue = replacement.getNutrientValue(goalContext.getTargetNutrient());
+        double currentTotal = currentNutrients.getOrDefault(goalContext.getTargetNutrient(), 0.0);
         double newTotal = currentTotal - originalValue + replacementValue;
         
-        // If target is reached, give extra score
-        if (direction.equals("increase") && newTotal >= currentTotal + targetAmount) {
-            baseScore += 10.0; // Bonus score for reaching target
-        } else if (direction.equals("decrease") && newTotal <= currentTotal - targetAmount) {
-            baseScore += 10.0; // Bonus score for reaching target
+        if (goalContext.getDirection().equals("increase") && newTotal >= currentTotal + goalContext.getTargetAmount()) {
+            return 10.0; // Bonus score for reaching target
+        } else if (goalContext.getDirection().equals("decrease") && newTotal <= currentTotal - goalContext.getTargetAmount()) {
+            return 10.0; // Bonus score for reaching target
         }
         
-        // Bonus score for same group replacement
-        if (original.getFoodGroup().equals(replacement.getFoodGroup())) {
-            baseScore += 2.0;
-        }
-        
-        return baseScore;
+        return 0.0;
     }
 
-    private Map<String, Double> calculateMealNutrients(List<IngredientEntry> meal, Map<Integer, FoodItem> foodDatabase) {
-        Map<String, Double> totalNutrients = new HashMap<>();
-        
-        for (IngredientEntry entry : meal) {
-            FoodItem food = foodDatabase.get(entry.getFoodID());
-            if (food != null) {
-                double quantity = entry.getQuantity();
-                
-                // Add calories
-                totalNutrients.merge("calories", food.getCalories() * quantity / 100.0, Double::sum);
-                
-                // Add other nutrients
-                for (Map.Entry<String, Double> nutrient : food.getNutrients().entrySet()) {
-                    totalNutrients.merge(nutrient.getKey().toLowerCase(), 
-                                       nutrient.getValue() * quantity / 100.0, Double::sum);
-                }
-            }
-        }
-        
-        return totalNutrients;
+    private double calculateGroupBonus(FoodItem original, FoodItem replacement) {
+        return original.getFoodGroup().equals(replacement.getFoodGroup()) ? 2.0 : 0.0;
     }
 
-    private boolean isBetterForGoal(FoodItem candidate, FoodItem original, Goal goal) {
-        String nutrient = goal.getNutrient().toLowerCase();
-        String direction = goal.getDirection().toLowerCase();
+
+
+    private boolean isBetterForGoal(FoodItem candidate, FoodItem original, GoalContext goalContext) {
+        double originalValue = original.getNutrientValue(goalContext.getTargetNutrient());
+        double candidateValue = candidate.getNutrientValue(goalContext.getTargetNutrient());
         
-        double originalValue = getNutrientValue(original, nutrient);
-        double candidateValue = getNutrientValue(candidate, nutrient);
-        
-        if (direction.equals("increase")) {
+        if (goalContext.getDirection().equals("increase")) {
             return candidateValue > originalValue;
-        } else if (direction.equals("decrease")) {
+        } else if (goalContext.getDirection().equals("decrease")) {
             return candidateValue < originalValue;
         }
         
         return false;
     }
     
-    private double getNutrientValue(FoodItem food, String nutrient) {
-        Map<String, Double> nutrients = food.getNutrients();
-        switch (nutrient) {
-            case "calories":
-                return food.getCalories();
-            case "protein":
-                return nutrients.getOrDefault("Protein", 0.0);
-            case "carbs":
-                return nutrients.getOrDefault("Carbs", 0.0);
-            case "fat":
-                return nutrients.getOrDefault("Fat", 0.0);
-            case "fiber":
-                return nutrients.getOrDefault("Fiber", 0.0);
-            default:
-                return nutrients.getOrDefault(nutrient, 0.0);
-        }
-    }
+
     
-    private String generateReason(FoodItem original, FoodItem replacement, Goal goal) {
-        String nutrient = goal.getNutrient();
-        String direction = goal.getDirection();
-        
-        double originalValue = getNutrientValue(original, nutrient.toLowerCase());
-        double replacementValue = getNutrientValue(replacement, nutrient.toLowerCase());
-        double difference = replacementValue - originalValue;
-        
-        String improvement = direction.equals("increase") ? "increases" : "decreases";
-        String unit = nutrient.equalsIgnoreCase("calories") ? "calories" : "g";
-        
-        return String.format("Replace %s with %s to %s %s by %.1f %s", 
-                           original.getName(), replacement.getName(), 
-                           improvement, nutrient, Math.abs(difference), unit);
-    }
+
 
     private RecommendationStrategy selectStrategy(Goal goal) {
-        return switch (goal.getNutrient().toLowerCase()) {
-            case "calories" -> new CalorieSwapStrategy();
-            case "fiber" -> new FiberSwapStrategy();
-            case "protein" -> new ProteinSwapStrategy();
-            case "carbs" -> new CarbsSwapStrategy();
-            case "fat" -> new FatSwapStrategy();
-            // add more cases like sodium, protein etc.
-            default -> null;
-        };
+        return StrategyFactory.createStrategy(goal.getNutrient());
     }
 
     private double getIntensityFactor(String intensity) {
-        return switch (intensity.toLowerCase()) {
-            case "moderate" -> 1.25;
-            case "high" -> 1.5;
-            default -> 1.0;
-        };
+        return IntensityLevel.fromString(intensity).getFactor();
     }
 }

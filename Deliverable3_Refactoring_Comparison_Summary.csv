@@ -1,0 +1,23 @@
+Component,Refactoring Type,Before CLOC,After CLOC,Before CCC,After CCC,Before WMC,After WMC,Before RFC,After RFC,Before Status,After Status,Improvement
+backend.SwapEngine,Long Method + Feature Envy + Data Clump + Switch Statement,176,121,27,21,44,34,44,46,CRITICAL,Warning,Significant improvement - reduced complexity
+backend.SwapEngine.findBestSwapForGoal(),Extract Method,34,34,5,5,17,17,2,2,Good,Good,Maintained quality after refactoring
+backend.SwapEngine.calculateSwapScore(),Extract Method,6,6,0,0,7,7,4,4,Good,Good,Maintained quality after refactoring
+backend.SwapEngine.isNutrientBalanced(),Extract Method,14,14,2,2,9,9,1,1,Good,Good,Maintained quality after refactoring
+model.FoodItem,Feature Envy (Move Method),54,71,0,1,14,21,15,18,Good,Good,Added getNutrientValue method
+service.NutrientCalculator,Feature Envy (Move Method),NEW,17,NEW,3,NEW,4,NEW,12,NEW,Good,New utility class for nutrient calculations
+model.GoalContext,Data Clump (Extract Class),NEW,14,NEW,0,NEW,4,NEW,8,NEW,Good,New class to encapsulate goal data
+strategy.StrategyFactory,Switch Statement (Replace with Polymorphism),NEW,7,NEW,1,NEW,3,NEW,7,NEW,Good,New factory class for strategy creation
+model.IntensityLevel,Switch Statement (Replace with Enum),NEW,13,NEW,1,NEW,5,NEW,5,NEW,Good,New enum for intensity levels
+chart.AbstractChart,Code Duplication (Template Method),NEW,12,NEW,0,NEW,4,NEW,5,NEW,Good,New abstract class for chart components
+chart.BarChart,Code Duplication (Template Method),13,4,0,0,3,1,4,1,Good,Good,Simplified through inheritance
+chart.PieChart,Code Duplication (Template Method),13,4,0,0,3,1,4,1,Good,Good,Simplified through inheritance
+chart.AbstractChartDecorator,Code Duplication (Template Method),NEW,8,NEW,0,NEW,3,NEW,5,NEW,Good,New abstract decorator class
+chart.HighlightDecorator,Code Duplication (Template Method),8,7,0,0,2,2,5,4,Good,Good,Simplified through inheritance
+chart.InteractiveChartDecorator,Code Duplication (Template Method),8,7,0,0,2,2,5,4,Good,Good,Simplified through inheritance
+chart.TooltopDecorator,Code Duplication (Template Method),8,7,0,0,2,2,5,4,Good,Good,Simplified through inheritance
+service.SwapReasonGenerator,Feature Envy (Move Method),NEW,12,NEW,2,NEW,3,NEW,9,NEW,Good,New utility class for reason generation
+Overall Package Metrics - backend,Multiple Refactorings,243,188,96,80,75,95,132,92,CRITICAL,CRITICAL,Reduced CLOC and CCC
+Overall Package Metrics - chart,Code Duplication Refactoring,188,187,60,60,141,141,558,558,Good,Good,Maintained quality with better structure
+Overall Package Metrics - model,Data Clump + Feature Envy,159,203,12,12,119,119,210,210,Good,Good,Added new utility classes
+Overall Package Metrics - service,Feature Envy + Switch Statement,941,970,112,112,119,119,184,184,CRITICAL,CRITICAL,Added new utility classes
+Overall Package Metrics - strategy,Switch Statement + Code Duplication,77,84,4,4,6,6,6,6,Good,Good,Added factory pattern 

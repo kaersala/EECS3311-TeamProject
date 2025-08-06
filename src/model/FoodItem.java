@@ -72,6 +72,24 @@ public class FoodItem {
         this.foodGroup = foodGroup;
     }
 
+    public double getNutrientValue(String nutrient) {
+        Map<String, Double> nutrients = getNutrients();
+        switch (nutrient.toLowerCase()) {
+            case "calories":
+                return getCalories();
+            case "protein":
+                return nutrients.getOrDefault("Protein", 0.0);
+            case "carbs":
+                return nutrients.getOrDefault("Carbs", 0.0);
+            case "fat":
+                return nutrients.getOrDefault("Fat", 0.0);
+            case "fiber":
+                return nutrients.getOrDefault("Fiber", 0.0);
+            default:
+                return nutrients.getOrDefault(nutrient, 0.0);
+        }
+    }
+
     @Override
     public String toString() {
         return name + " (Group: " + foodGroup + ")";
